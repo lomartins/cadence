@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { applyIntensity, vibeForWorkMode, loadCuration } from "../src/data/curation.js";
+import {
+  applyIntensity,
+  vibeForWorkMode,
+  loadCuration,
+  looksVocal,
+  vibeAllowsLyrics,
+} from "../src/data/curation.js";
 import { classify } from "../src/detect/classifier.js";
 import { buildQueue, rankCandidates } from "../src/learn/ranker.js";
 import { newProfile } from "../src/learn/coldstart.js";
@@ -23,6 +29,25 @@ describe("curation / intensity", () => {
   it("intensity >=3 adds a driving flavor", () => {
     const qs = applyIntensity("momentum", 4);
     expect(qs.some((q) => /epic|energetic|drum and bass|driving/i.test(q))).toBe(true);
+  });
+
+  it("forces 'instrumental' on every query for lyric-free vibes", () => {
+    for (const v of ["deep-focus", "wordless-write", "calm-read", "drive"] as const) {
+      const qs = applyIntensity(v, 2);
+      expect(qs.every((q) => /instrumental/i.test(q))).toBe(true);
+    }
+  });
+
+  it("does NOT force instrumental on lyric-friendly vibes", () => {
+    expect(vibeAllowsLyrics("momentum")).toBe(true);
+    expect(vibeAllowsLyrics("decompress")).toBe(true);
+    expect(vibeAllowsLyrics("deep-focus")).toBe(false);
+  });
+
+  it("flags obviously-vocal titles", () => {
+    expect(looksVocal("Samba Enredo 2024 (Ao Vivo)")).toBe(true);
+    expect(looksVocal("Some Song feat. MC X")).toBe(true);
+    expect(looksVocal("Rainy Lofi Piano Study")).toBe(false);
   });
 });
 

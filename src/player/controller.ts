@@ -33,12 +33,16 @@ async function discover(
 ): Promise<TrackCandidate[]> {
   const pool = await poolForVibe(vibe, intensity, cfg.market, 1);
 
-  // sprinkle in a few of the user's own top tracks for personalization
-  try {
-    const tops = await topTracks("medium_term", 10, cfg.market);
-    for (const t of tops) if (!pool.some((p) => p.id === t.id)) pool.push(t);
-  } catch {
-    /* optional */
+  // Personalize ONLY for vibes that allow lyrics (momentum/decompress). For
+  // focus/deep-work vibes we keep it purely curated + instrumental, so the
+  // user's own (often vocal) top tracks never leak into a focus session.
+  if (vibeDef(vibe).audio.lyrics) {
+    try {
+      const tops = await topTracks("medium_term", 10, cfg.market);
+      for (const t of tops) if (!pool.some((p) => p.id === t.id)) pool.push(t);
+    } catch {
+      /* optional */
+    }
   }
 
   await enrichGenres(pool, 24);

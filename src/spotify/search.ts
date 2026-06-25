@@ -1,5 +1,5 @@
 import { apiGet } from "./client.js";
-import { applyIntensity } from "../data/curation.js";
+import { applyIntensity, looksVocal, vibeAllowsLyrics } from "../data/curation.js";
 import type { Intensity, TrackCandidate, VibeSlug } from "../shared/types.js";
 import { log } from "../shared/log.js";
 
@@ -76,12 +76,15 @@ export async function poolForVibe(
   perQueryPages = 1,
 ): Promise<TrackCandidate[]> {
   const queries = buildQueries(vibe, intensity);
+  const dropVocal = !vibeAllowsLyrics(vibe);
   const seen = new Set<string>();
   const pool: TrackCandidate[] = [];
   for (const q of queries) {
     const tracks = await searchTracks(q, market, { pages: perQueryPages });
     for (const t of tracks) {
       if (seen.has(t.id)) continue;
+      // safety net for focus modes: skip obviously-vocal tracks
+      if (dropVocal && looksVocal(t.title)) continue;
       seen.add(t.id);
       pool.push(t);
     }

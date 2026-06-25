@@ -53,7 +53,28 @@ export function applyIntensity(vibe: VibeSlug, intensity: Intensity): string[] {
     const hint = `${scale.energy} energy`;
     queries = queries.map((q) => (q.includes("energy") ? q : `${q} ${hint}`));
   }
+
+  // Lyric-free vibes (focus/debug/write/read/plan/study/crunch): force the
+  // "instrumental" term so Search biases away from vocal tracks. Spotify's
+  // audio-features endpoint is dead, so the query term is our main lever.
+  if (!def.audio.lyrics) {
+    queries = queries.map((q) => (/instrumental/i.test(q) ? q : `${q} instrumental`));
+  }
   return queries;
+}
+
+// Heuristic: does a track title/album look like it has vocals? Used as a
+// safety-net filter for lyric-free vibes (we can't read instrumentalness via API).
+const VOCAL_CUES =
+  /\b(feat\.?|ft\.?|featuring|vocal|vocals|sung|singer|lyrics|letra|ao vivo|acappella|a cappella|karaoke|cover)\b|\(with\s/i;
+
+export function looksVocal(title?: string): boolean {
+  if (!title) return false;
+  return VOCAL_CUES.test(title);
+}
+
+export function vibeAllowsLyrics(vibe: VibeSlug): boolean {
+  return CURATION.vibes[vibe].audio.lyrics;
 }
 
 const FEATURE_BAND: Record<AudioFeatureKey, [number, number]> = {

@@ -21673,7 +21673,18 @@ function applyIntensity(vibe, intensity) {
     const hint = `${scale.energy} energy`;
     queries = queries.map((q) => q.includes("energy") ? q : `${q} ${hint}`);
   }
+  if (!def.audio.lyrics) {
+    queries = queries.map((q) => /instrumental/i.test(q) ? q : `${q} instrumental`);
+  }
   return queries;
+}
+var VOCAL_CUES = /\b(feat\.?|ft\.?|featuring|vocal|vocals|sung|singer|lyrics|letra|ao vivo|acappella|a cappella|karaoke|cover)\b|\(with\s/i;
+function looksVocal(title) {
+  if (!title) return false;
+  return VOCAL_CUES.test(title);
+}
+function vibeAllowsLyrics(vibe) {
+  return CURATION.vibes[vibe].audio.lyrics;
 }
 function welford(mean, n = 8) {
   return { mean, var: 0.05, n };
@@ -22712,12 +22723,14 @@ async function searchTracks(q, market, opts = {}) {
 }
 async function poolForVibe(vibe, intensity, market, perQueryPages = 1) {
   const queries = buildQueries(vibe, intensity);
+  const dropVocal = !vibeAllowsLyrics(vibe);
   const seen = /* @__PURE__ */ new Set();
   const pool = [];
   for (const q of queries) {
     const tracks = await searchTracks(q, market, { pages: perQueryPages });
     for (const t of tracks) {
       if (seen.has(t.id)) continue;
+      if (dropVocal && looksVocal(t.title)) continue;
       seen.add(t.id);
       pool.push(t);
     }
@@ -22805,10 +22818,12 @@ function getLastQueueHead() {
 }
 async function discover(cfg2, state4, vibe, intensity) {
   const pool = await poolForVibe(vibe, intensity, cfg2.market, 1);
-  try {
-    const tops = await topTracks("medium_term", 10, cfg2.market);
-    for (const t of tops) if (!pool.some((p) => p.id === t.id)) pool.push(t);
-  } catch {
+  if (vibeDef(vibe).audio.lyrics) {
+    try {
+      const tops = await topTracks("medium_term", 10, cfg2.market);
+      for (const t of tops) if (!pool.some((p) => p.id === t.id)) pool.push(t);
+    } catch {
+    }
   }
   await enrichGenres(pool, 24);
   const profile = ensureProfile(state4, vibe);
