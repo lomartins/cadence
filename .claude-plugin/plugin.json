@@ -9,10 +9,7 @@
     "email": "luisamartins.dev@gmail.com"
   },
   "homepage": "https://github.com/lomartins/cadence",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/lomartins/cadence.git"
-  },
+  "repository": "https://github.com/lomartins/cadence",
   "license": "MIT",
   "keywords": ["spotify", "music", "focus", "productivity", "flow", "deep-work"],
   "defaultEnabled": true,
