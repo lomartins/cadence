@@ -1,0 +1,34 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# build output — NOTE: dist/ is intentionally committed so the plugin installs
+# from the marketplace with no build step. Rebuild with `npm run build`.
+build/
+*.tsbuildinfo
+
+# logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# env / secrets — NEVER commit Spotify credentials or tokens
+.env
+.env.*
+!.env.example
+
+# cadence runtime state (per-user, lives in ~/.config/cadence by default)
+.cadence/
+*.local.json
+
+# editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# test / coverage
+coverage/
+.nyc_output/

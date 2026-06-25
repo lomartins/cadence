@@ -1,0 +1,41 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cadence logo">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="256" y2="256" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#171A2B"/>
+      <stop offset="1" stop-color="#0B0D18"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="56" y1="200" x2="200" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22D3A6"/>
+      <stop offset="1" stop-color="#7C5CFC"/>
+    </linearGradient>
+    <linearGradient id="wave" x1="40" y1="128" x2="216" y2="128" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7C5CFC" stop-opacity="0.0"/>
+      <stop offset="0.5" stop-color="#9D8BFF" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#22D3A6" stop-opacity="0.0"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect x="0" y="0" width="256" height="256" rx="56" fill="url(#bg)"/>
+  <rect x="1.5" y="1.5" width="253" height="253" rx="54.5" fill="none" stroke="#2A2F4A" stroke-width="3"/>
+
+  <!-- cadence wave: rhythm line through the bars -->
+  <path d="M28 128 C 56 84, 80 84, 100 128 S 148 172, 168 128 S 212 84, 228 128"
+        stroke="url(#wave)" stroke-width="6" stroke-linecap="round" fill="none" opacity="0.55"/>
+
+  <!-- equalizer bars: a rising cadence -->
+  <g filter="url(#glow)">
+    <rect x="56"  y="112" width="18" height="32"  rx="9" fill="url(#accent)"/>
+    <rect x="86"  y="86"  width="18" height="84"  rx="9" fill="url(#accent)"/>
+    <rect x="116" y="64"  width="18" height="128" rx="9" fill="url(#accent)"/>
+    <rect x="146" y="92"  width="18" height="72"  rx="9" fill="url(#accent)"/>
+    <rect x="176" y="116" width="18" height="24"  rx="9" fill="url(#accent)"/>
+  </g>
+
+  <!-- focus dot -->
+  <circle cx="125" cy="128" r="7" fill="#0B0D18"/>
+  <circle cx="125" cy="128" r="7" fill="none" stroke="#22D3A6" stroke-width="2.5"/>
+</svg>

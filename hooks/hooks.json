@@ -1,0 +1,54 @@
+{
+  "description": "Cadence hooks — feed lightweight work-mode signals to the running MCP brain over a local socket. All non-blocking.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CADENCE_DATA_DIR=\"${CLAUDE_PLUGIN_DATA}\" node \"${CLAUDE_PLUGIN_ROOT}/dist/hooks/dispatch.mjs\" now-playing",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CADENCE_DATA_DIR=\"${CLAUDE_PLUGIN_DATA}\" node \"${CLAUDE_PLUGIN_ROOT}/dist/hooks/dispatch.mjs\" prompt",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|Bash|Read|Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CADENCE_DATA_DIR=\"${CLAUDE_PLUGIN_DATA}\" node \"${CLAUDE_PLUGIN_ROOT}/dist/hooks/dispatch.mjs\" tool",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CADENCE_DATA_DIR=\"${CLAUDE_PLUGIN_DATA}\" node \"${CLAUDE_PLUGIN_ROOT}/dist/hooks/dispatch.mjs\" session-end",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ]
+  }
+}

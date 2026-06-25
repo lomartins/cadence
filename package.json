@@ -1,0 +1,41 @@
+{
+  "name": "cadence-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cadence — focus music for Claude Code. Detects your work mode and plays Spotify music matched to the task, learning your taste over time.",
+  "type": "module",
+  "license": "MIT",
+  "author": {
+    "name": "Luisa Martins",
+    "email": "luisamartins.dev@gmail.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lomartins/cadence.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev": "tsx src/server/index.ts",
+    "prepare": "node build.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.23.8"
+  },
+  "optionalDependencies": {
+    "keytar": "^7.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "esbuild": "^0.24.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  }
+}

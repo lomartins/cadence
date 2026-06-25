@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "cadence": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/dist/server/index.mjs"],
+      "env": {
+        "CADENCE_DATA_DIR": "${CLAUDE_PLUGIN_DATA}",
+        "CADENCE_PLUGIN_ROOT": "${CLAUDE_PLUGIN_ROOT}",
+        "CADENCE_MARKET": "${user_config.market}",
+        "CADENCE_CLIENT_ID": "${user_config.spotify_client_id}",
+        "CADENCE_DEFAULT_VIBE": "${user_config.default_vibe}",
+        "CADENCE_AUTO_SWITCH": "${user_config.auto_switch}",
+        "CADENCE_LOCAL_FALLBACK": "${user_config.enable_local_fallback}",
+        "CADENCE_DATA_DIR_OVERRIDE": "${user_config.data_dir}"
+      }
+    }
+  }
+}

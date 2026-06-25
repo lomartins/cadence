@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "cadence",
+  "displayName": "Cadence",
+  "version": "0.1.0",
+  "description": "Focus music for Claude Code. Detects your current work mode and plays Spotify music matched to the task, learning your taste over time.",
+  "author": {
+    "name": "Luisa Martins",
+    "email": "luisamartins.dev@gmail.com"
+  },
+  "homepage": "https://github.com/lomartins/cadence",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lomartins/cadence.git"
+  },
+  "license": "MIT",
+  "keywords": ["spotify", "music", "focus", "productivity", "flow", "deep-work"],
+  "defaultEnabled": true,
+  "userConfig": {
+    "spotify_client_id": {
+      "type": "string",
+      "title": "Spotify Client ID",
+      "description": "Client ID from your own Spotify app (developer.spotify.com/dashboard). Register a Redirect URI of 127.0.0.1 (loopback, WITHOUT a port). Each user needs their own app — Spotify dev-mode caps apps at 5 users.",
+      "required": true,
+      "sensitive": false
+    },
+    "market": {
+      "type": "string",
+      "title": "Spotify market",
+      "description": "ISO 3166-1 alpha-2 country code (e.g. US, GB, BR). Required because Spotify dev-mode no longer exposes your account country.",
+      "default": "US"
+    },
+    "default_vibe": {
+      "type": "string",
+      "title": "Default vibe",
+      "description": "Vibe slug used when no work mode is detected: deep-focus, steady-flow, wordless-write, open-think, calm-read, alert-study, momentum, decompress, drive.",
+      "default": "deep-focus"
+    },
+    "auto_switch": {
+      "type": "boolean",
+      "title": "Auto-switch music",
+      "description": "Let Cadence detect your work mode and switch music automatically. Toggle any time with /cadence auto.",
+      "default": true
+    },
+    "enable_local_fallback": {
+      "type": "boolean",
+      "title": "Local player fallback",
+      "description": "On Linux (playerctl/MPRIS) or macOS (AppleScript), control the desktop Spotify app for play/pause/next when you lack Premium or no Web API device is active.",
+      "default": true
+    },
+    "data_dir": {
+      "type": "directory",
+      "title": "Data directory override",
+      "description": "Where to store learned preferences and state. Defaults to the plugin data dir, which survives updates.",
+      "required": false
+    }
+  }
+}
