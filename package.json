@@ -1,6 +1,6 @@
 {
   "name": "cadence-plugin",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Cadence — focus music for Claude Code. Detects your work mode and plays Spotify music matched to the task, learning your taste over time.",
   "type": "module",

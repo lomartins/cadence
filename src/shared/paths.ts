@@ -27,6 +27,7 @@ export const statePath = () => join(d(), "state.json");
 export const feedbackPath = () => join(d(), "feedback.jsonl");
 export const configPath = () => join(d(), "config.json");
 export const credentialsPath = () => join(d(), "credentials.json");
+export const authPendingPath = () => join(d(), "auth-pending.json");
 export const cacheDir = () => join(d(), "cache");
 export const cachePath = (name: string) => join(cacheDir(), name);
 export const sockPath = () => join(d(), "cadence.sock");

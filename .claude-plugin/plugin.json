@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "cadence",
   "displayName": "Cadence",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Focus music for Claude Code. Detects your current work mode and plays Spotify music matched to the task, learning your taste over time.",
   "author": {
     "name": "Luisa Martins",

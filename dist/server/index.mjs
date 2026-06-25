@@ -21189,6 +21189,7 @@ var statePath = () => join(d(), "state.json");
 var feedbackPath = () => join(d(), "feedback.jsonl");
 var configPath = () => join(d(), "config.json");
 var credentialsPath = () => join(d(), "credentials.json");
+var authPendingPath = () => join(d(), "auth-pending.json");
 var cacheDir = () => join(d(), "cache");
 var cachePath = (name) => join(cacheDir(), name);
 var sockPath = () => join(d(), "cadence.sock");
@@ -22220,6 +22221,7 @@ async function forget(state4, uri, cfg2) {
 // src/spotify/auth.ts
 import http from "node:http";
 import { spawn } from "node:child_process";
+import { writeFileSync as writeFileSync2, readFileSync as readFileSync2, unlinkSync } from "node:fs";
 
 // src/spotify/pkce.ts
 import { randomBytes, createHash } from "node:crypto";
@@ -22248,6 +22250,30 @@ var SCOPES = [
 ].join(" ");
 var pending = null;
 var activeCleanup = null;
+var PENDING_TTL_MS = 15 * 60 * 1e3;
+function persistPending(p) {
+  try {
+    ensureDirs();
+    writeFileSync2(authPendingPath(), JSON.stringify({ ...p, ts: Date.now() }), { mode: 384 });
+  } catch (e) {
+    log("warn", "could not persist auth pending state", String(e));
+  }
+}
+function loadPersistedPending() {
+  try {
+    const j = JSON.parse(readFileSync2(authPendingPath(), "utf8"));
+    if (Date.now() - (j.ts ?? 0) > PENDING_TTL_MS) return null;
+    return { verifier: j.verifier, state: j.state, redirectUri: j.redirectUri };
+  } catch {
+    return null;
+  }
+}
+function clearPersistedPending() {
+  try {
+    unlinkSync(authPendingPath());
+  } catch {
+  }
+}
 function openBrowser(url) {
   const platform = process.platform;
   const cmd = platform === "darwin" ? "open" : platform === "win32" ? "cmd" : "xdg-open";
@@ -22281,6 +22307,7 @@ async function exchangeCode(code, redirectUri, verifier) {
   }
   const json = await res.json();
   await setTokens(json.access_token, json.refresh_token, json.expires_in);
+  clearPersistedPending();
   log("info", "spotify connected");
 }
 function buildAuthorizeUrl(redirectUri, challenge, state4) {
@@ -22300,6 +22327,7 @@ function buildAuthorizeUrl(redirectUri, challenge, state4) {
 async function beginAuth(port = 8888, timeoutMs = 3e5) {
   const cid = clientId();
   if (!cid) throw new NeedsAuthError("CADENCE_CLIENT_ID not configured");
+  activeCleanup?.();
   const verifier = genVerifier();
   const challenge = challengeFromVerifier(verifier);
   const state4 = genState();
@@ -22338,6 +22366,7 @@ async function beginAuth(port = 8888, timeoutMs = 3e5) {
     server.close();
     pending = null;
     activeCleanup = null;
+    clearPersistedPending();
   };
   activeCleanup = cleanup;
   await new Promise((resolve, reject) => {
@@ -22360,6 +22389,7 @@ async function beginAuth(port = 8888, timeoutMs = 3e5) {
   });
   const redirectUri = `http://127.0.0.1:${port}/callback`;
   pending = { verifier, state: state4, redirectUri };
+  persistPending(pending);
   const url = buildAuthorizeUrl(redirectUri, challenge, state4);
   timer = setTimeout(() => {
     cleanup();
@@ -22377,12 +22407,18 @@ async function beginAuth(port = 8888, timeoutMs = 3e5) {
   };
 }
 async function completeWithRedirectUrl(fullUrl) {
-  if (!pending) throw new Error("No auth flow in progress \u2014 run connect first");
+  const p = pending ?? loadPersistedPending();
+  if (!p) {
+    throw new Error("No auth flow in progress \u2014 run /cadence connect first to generate a fresh URL.");
+  }
   const u = new URL(fullUrl);
   const code = u.searchParams.get("code");
   const gotState = u.searchParams.get("state");
-  if (!code || gotState !== pending.state) throw new Error("Invalid redirect URL (state mismatch)");
-  await exchangeCode(code, pending.redirectUri, pending.verifier);
+  if (!code) throw new Error("That URL has no ?code= \u2014 paste the full redirected URL.");
+  if (gotState !== p.state) {
+    throw new Error("State mismatch \u2014 that URL is from an older attempt. Run /cadence connect for a fresh URL.");
+  }
+  await exchangeCode(code, p.redirectUri, p.verifier);
   activeCleanup?.();
 }
 var SUCCESS_HTML = `<!doctype html><meta charset=utf-8><title>Cadence connected</title>
@@ -22942,9 +22978,11 @@ ${handle.url}`;
     return `Opening your browser to authorize Spotify. If it didn't open, visit:
 ${handle.url}
 
-(Your Spotify app's Redirect URI must be exactly http://127.0.0.1:${cfg.auth_port}/callback \u2014 loopback IPv4, NOT localhost.)
+After you click "Agree", it completes automatically \u2014 you'll see a "Cadence is connected" page. Then run /cadence status to confirm and /cadence play to start.
 
-After approving, you'll see a success page. If you're on a headless/SSH session, copy the full redirected URL and run:
+Redirect URI in your Spotify app must be exactly: http://127.0.0.1:${cfg.auth_port}/callback (loopback IPv4, NOT localhost).
+
+Headless/SSH (browser can't reach this machine)? Copy the full redirected URL from the address bar and run:
 /cadence connect <paste-url-here>`;
   } catch (e) {
     return `Could not start authorization: ${String(e)}`;

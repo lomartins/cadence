@@ -1,8 +1,10 @@
 import http from "node:http";
 import { spawn } from "node:child_process";
+import { writeFileSync, readFileSync, unlinkSync } from "node:fs";
 import { clientId } from "../config/load.js";
 import { genVerifier, challengeFromVerifier, genState } from "./pkce.js";
 import { setTokens, NeedsAuthError } from "./tokens.js";
+import { authPendingPath, ensureDirs } from "../shared/paths.js";
 import { log } from "../shared/log.js";
 
 const AUTH_URL = "https://accounts.spotify.com/authorize";
@@ -26,6 +28,37 @@ interface Pending {
 let pending: Pending | null = null;
 // closes the loopback server + clears the timeout for the in-flight flow
 let activeCleanup: (() => void) | null = null;
+
+const PENDING_TTL_MS = 15 * 60 * 1000;
+
+// Persist the PKCE state to disk so a manual paste can complete even if the MCP
+// server restarted or the loopback listener already closed.
+function persistPending(p: Pending): void {
+  try {
+    ensureDirs();
+    writeFileSync(authPendingPath(), JSON.stringify({ ...p, ts: Date.now() }), { mode: 0o600 });
+  } catch (e) {
+    log("warn", "could not persist auth pending state", String(e));
+  }
+}
+
+function loadPersistedPending(): Pending | null {
+  try {
+    const j = JSON.parse(readFileSync(authPendingPath(), "utf8")) as Pending & { ts: number };
+    if (Date.now() - (j.ts ?? 0) > PENDING_TTL_MS) return null;
+    return { verifier: j.verifier, state: j.state, redirectUri: j.redirectUri };
+  } catch {
+    return null;
+  }
+}
+
+function clearPersistedPending(): void {
+  try {
+    unlinkSync(authPendingPath());
+  } catch {
+    /* nothing to clear */
+  }
+}
 
 export interface AuthHandle {
   url: string;
@@ -72,6 +105,7 @@ async function exchangeCode(code: string, redirectUri: string, verifier: string)
     expires_in: number;
   };
   await setTokens(json.access_token, json.refresh_token, json.expires_in);
+  clearPersistedPending();
   log("info", "spotify connected");
 }
 
@@ -97,6 +131,9 @@ function buildAuthorizeUrl(redirectUri: string, challenge: string, state: string
 export async function beginAuth(port = 8888, timeoutMs = 300_000): Promise<AuthHandle> {
   const cid = clientId();
   if (!cid) throw new NeedsAuthError("CADENCE_CLIENT_ID not configured");
+
+  // tear down any prior in-flight flow so re-running connect frees the port
+  activeCleanup?.();
 
   const verifier = genVerifier();
   const challenge = challengeFromVerifier(verifier);
@@ -141,6 +178,7 @@ export async function beginAuth(port = 8888, timeoutMs = 300_000): Promise<AuthH
     server.close();
     pending = null;
     activeCleanup = null;
+    clearPersistedPending();
   };
   activeCleanup = cleanup;
 
@@ -165,6 +203,8 @@ export async function beginAuth(port = 8888, timeoutMs = 300_000): Promise<AuthH
   const redirectUri = `http://127.0.0.1:${port}/callback`;
   pending = { verifier, state, redirectUri };
 
+  persistPending(pending);
+
   const url = buildAuthorizeUrl(redirectUri, challenge, state);
   timer = setTimeout(() => {
     cleanup();
@@ -184,14 +224,21 @@ export async function beginAuth(port = 8888, timeoutMs = 300_000): Promise<AuthH
   };
 }
 
-// Manual fallback for headless/SSH: user pastes the full redirected URL.
+// Manual fallback for headless/SSH: user pastes the full redirected URL. Works
+// even after a restart — the PKCE state is recovered from disk.
 export async function completeWithRedirectUrl(fullUrl: string): Promise<void> {
-  if (!pending) throw new Error("No auth flow in progress — run connect first");
+  const p = pending ?? loadPersistedPending();
+  if (!p) {
+    throw new Error("No auth flow in progress — run /cadence connect first to generate a fresh URL.");
+  }
   const u = new URL(fullUrl);
   const code = u.searchParams.get("code");
   const gotState = u.searchParams.get("state");
-  if (!code || gotState !== pending.state) throw new Error("Invalid redirect URL (state mismatch)");
-  await exchangeCode(code, pending.redirectUri, pending.verifier);
+  if (!code) throw new Error("That URL has no ?code= — paste the full redirected URL.");
+  if (gotState !== p.state) {
+    throw new Error("State mismatch — that URL is from an older attempt. Run /cadence connect for a fresh URL.");
+  }
+  await exchangeCode(code, p.redirectUri, p.verifier);
   // tear down the still-open loopback listener + timeout from beginAuth
   activeCleanup?.();
 }

@@ -91,7 +91,7 @@ export async function doConnect(redirectUrl?: string): Promise<string> {
     handle.done
       .then(() => log("info", "auth completed after handoff"))
       .catch((e) => log("warn", "auth handoff failed", String(e)));
-    return `Opening your browser to authorize Spotify. If it didn't open, visit:\n${handle.url}\n\n(Your Spotify app's Redirect URI must be exactly http://127.0.0.1:${cfg.auth_port}/callback — loopback IPv4, NOT localhost.)\n\nAfter approving, you'll see a success page. If you're on a headless/SSH session, copy the full redirected URL and run:\n/cadence connect <paste-url-here>`;
+    return `Opening your browser to authorize Spotify. If it didn't open, visit:\n${handle.url}\n\nAfter you click "Agree", it completes automatically — you'll see a "Cadence is connected" page. Then run /cadence status to confirm and /cadence play to start.\n\nRedirect URI in your Spotify app must be exactly: http://127.0.0.1:${cfg.auth_port}/callback (loopback IPv4, NOT localhost).\n\nHeadless/SSH (browser can't reach this machine)? Copy the full redirected URL from the address bar and run:\n/cadence connect <paste-url-here>`;
   } catch (e) {
     return `Could not start authorization: ${String(e)}`;
   }

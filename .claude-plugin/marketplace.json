@@ -11,7 +11,7 @@
       "name": "cadence",
       "source": "./",
       "description": "Detects your current work mode and plays Spotify music matched to the task, learning your preferences over time. Auto-switches or on request.",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "category": "productivity",
       "tags": ["spotify", "focus", "music", "flow", "deep-work"]
     }
