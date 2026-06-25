@@ -113,7 +113,10 @@ unexpectedly: only a **UserPromptSubmit** event can trigger it (tool activity
 never does), and only when music is **already playing** (it never starts
 playback on its own). `detect/session.ts` then gates the switch on: auto-switch
 enabled, the vibe genuinely changed, confidence ≥ threshold (default 0.72), and
-a debounce window (default 240s) since the last switch.
+a debounce window (default 240s) since the last switch. When it switches it does
+**not** interrupt the current track — `controller.queueVibe()` adds the new vibe
+to Spotify's "Up Next" queue so the current song finishes first (Web API backend
+only; manual vibe/play changes are immediate).
 
 ## Storage layout (`$CLAUDE_PLUGIN_DATA`, survives updates)
 

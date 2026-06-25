@@ -1,4 +1,5 @@
 import type {
+  Backend,
   CadenceConfig,
   Intensity,
   PlaybackState,
@@ -22,6 +23,30 @@ let lastQueue: TrackCandidate[] = [];
 
 export function getLastQueueHead(): TrackCandidate | undefined {
   return lastQueue[0];
+}
+
+// Remember which vibe + candidate each recently played/queued track belongs to,
+// so feedback is attributed to the track that is ACTUALLY playing — not to a vibe
+// we just switched to whose tracks haven't started yet (auto-switch handoff).
+interface TrackMeta {
+  vibe: VibeSlug;
+  candidate: TrackCandidate;
+}
+const trackMeta = new Map<string, TrackMeta>();
+const META_CAP = 300;
+
+function recordMeta(queue: TrackCandidate[], vibe: VibeSlug): void {
+  for (const c of queue) trackMeta.set(c.uri, { vibe, candidate: c });
+  // evict oldest entries past the cap (Map preserves insertion order)
+  while (trackMeta.size > META_CAP) {
+    const oldest = trackMeta.keys().next().value;
+    if (oldest === undefined) break;
+    trackMeta.delete(oldest);
+  }
+}
+
+export function getTrackMeta(uri?: string): TrackMeta | undefined {
+  return uri ? trackMeta.get(uri) : undefined;
 }
 
 // Discover + rank a fresh queue for a vibe/intensity using only surviving APIs.
@@ -95,6 +120,7 @@ export async function playVibe(
   try {
     const queue = await discover(cfg, state, vibe, intensity);
     lastQueue = queue;
+    recordMeta(queue, vibe);
     if (queue.length > 0) {
       await web.play({ uris: queue.slice(0, 50).map((c) => c.uri) });
       result.backend = "web";
@@ -143,6 +169,58 @@ export async function playVibe(
     result.message = `Playback failed: ${String(e)}`;
     return result;
   }
+}
+
+// Add the next vibe's tracks to the Spotify "Up Next" queue WITHOUT interrupting
+// the current track (used by auto-switch). The current song finishes, then these
+// tracks play; afterwards Spotify resumes the previous context (this is a
+// temporary "play next" detour, not a hard switch — by design). Returns how many
+// tracks actually landed, or null when queueing isn't possible (non-web backend,
+// no Premium, no device, nothing to queue).
+export async function queueVibe(
+  cfg: CadenceConfig,
+  state: State,
+  vibe: VibeSlug,
+  intensity: Intensity,
+  opts: { backend?: Backend; currentUri?: string } = {},
+  count = 8,
+): Promise<{ queued: number; first?: TrackCandidate } | null> {
+  // queueing only works over the Web API; playerctl/MPRIS can't insert a queue.
+  // Trust the caller's backend if provided to avoid a second GET /me/player.
+  const backend = opts.backend ?? (await nowPlaying(cfg).catch(() => null))?.backend;
+  if (backend !== "web") return null;
+
+  let queue: TrackCandidate[];
+  try {
+    queue = await discover(cfg, state, vibe, intensity);
+  } catch (e) {
+    log("warn", "queueVibe discover failed", String(e));
+    return null;
+  }
+
+  // don't re-queue the song that's already playing
+  const candidates = opts.currentUri ? queue.filter((t) => t.uri !== opts.currentUri) : queue;
+  const toQueue = candidates.slice(0, count);
+  if (toQueue.length === 0) return null;
+
+  // queue one at a time; stop at the first failure (tracks already added can't
+  // be un-added) and report what actually landed.
+  let queued = 0;
+  for (const t of toQueue) {
+    try {
+      await web.queueAdd(t.uri);
+      queued++;
+    } catch (e) {
+      log("warn", "queueAdd failed mid-loop, stopping", String(e));
+      break;
+    }
+  }
+  if (queued === 0) return null;
+
+  recordMeta(candidates, vibe);
+  lastQueue = candidates;
+  log("info", "queued vibe to play next", { vibe, intensity, queued });
+  return { queued, first: toQueue[0] };
 }
 
 async function webOrLocal(

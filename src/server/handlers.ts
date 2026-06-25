@@ -174,14 +174,19 @@ async function recordFeedback(
   const uri = np?.track?.uri ?? head?.uri;
   // nothing identifiable playing — don't pollute n_events / histograms with empties
   if (!uri && event !== "ban") return null;
+  // attribute to the track that is ACTUALLY playing (its recorded vibe), not the
+  // vibe we may have just queued — avoids cross-contaminating profiles during an
+  // auto-switch handoff.
+  const meta = controller.getTrackMeta(uri);
+  const cand = meta?.candidate ?? head;
   const ev: FeedbackEvent = {
     ts: new Date().toISOString(),
-    mode: s.current_vibe,
+    mode: meta?.vibe ?? s.current_vibe,
     event,
     track: uri,
-    artist: head?.artistId ? `spotify:artist:${head.artistId}` : undefined,
-    genres: head?.genres,
-    title: cfg.privacy.store_track_titles ? np?.track?.title ?? head?.title : undefined,
+    artist: cand?.artistId ? `spotify:artist:${cand.artistId}` : undefined,
+    genres: cand?.genres,
+    title: cfg.privacy.store_track_titles ? np?.track?.title ?? cand?.title : undefined,
     played_fraction: playedFraction,
     source: event.startsWith("sp_") ? "spotify" : event.startsWith("skip") || event === "completed" ? "player" : "user",
     hour: nowHour(),
@@ -224,11 +229,19 @@ export async function doDetectAndSwitch(ev: HookEvent): Promise<string | null> {
   log("debug", "detect", { workMode, confidence, decision });
   if (!decision.switch) return null;
 
+  // Don't cut the current track — queue the new vibe to play next. Reuse the np
+  // we already fetched (no second API call). Only commit the session switch if
+  // tracks actually landed, so a failed queue doesn't desync state or start the
+  // debounce timer.
+  const intensity = defaultIntensity(decision.vibe);
+  const res = await controller.queueVibe(cfg, state, decision.vibe, intensity, {
+    backend: np.backend,
+    currentUri: np.track?.uri,
+  });
+  if (!res || res.queued === 0) return null;
+
   applySwitch(SESSION, cfg, workMode, decision.vibe);
-  const s = getSession(SESSION, cfg);
-  const pb = await controller.playVibe(cfg, state, decision.vibe, s.intensity, workMode, true);
-  if (pb.is_playing) return `🎚️ Switched to ${vibeDef(decision.vibe).label} for ${workMode}.`;
-  return null;
+  return `🎚️ Queued ${vibeDef(decision.vibe).label} to play next (${res.queued} tracks) — for ${workMode}.`;
 }
 
 // ---- banner for SessionStart ----

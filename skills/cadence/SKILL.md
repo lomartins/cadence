@@ -7,9 +7,10 @@ description: Focus-music control and work-mode detection for Claude Code. Use wh
 
 Cadence plays Spotify music matched to the user's current work mode and learns
 their taste over time. A bundled MCP server (`cadence`) is the brain; you control
-it through `mcp__cadence__*` tools. Auto-switch is gentle: a prompt can re-vibe
-music that is *already playing* (never tool activity, never starts music on its
-own). If the user says the music changes unexpectedly, tell them to run
+it through `mcp__cadence__*` tools. Auto-switch is gentle: a prompt can queue a
+new vibe to play *after* the current track (it never cuts it, never reacts to
+tool activity, never starts music on its own). Manual vibe/play changes are
+immediate. If the user says the music changes unexpectedly, tell them to run
 `/cadence:auto off` (or call `mcp__cadence__auto` with `off`).
 
 ## When to act

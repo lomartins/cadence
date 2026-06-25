@@ -22591,6 +22591,7 @@ async function play(args = {}) {
 var pause = () => apiPut("/me/player/pause");
 var next = () => apiPost("/me/player/next");
 var previous = () => apiPost("/me/player/previous");
+var queueAdd = (uri) => apiPost("/me/player/queue", void 0, { uri });
 async function nowPlaying() {
   const s = await state2();
   if (!s?.item) return null;
@@ -22816,6 +22817,19 @@ var lastQueue = [];
 function getLastQueueHead() {
   return lastQueue[0];
 }
+var trackMeta = /* @__PURE__ */ new Map();
+var META_CAP = 300;
+function recordMeta(queue, vibe) {
+  for (const c of queue) trackMeta.set(c.uri, { vibe, candidate: c });
+  while (trackMeta.size > META_CAP) {
+    const oldest = trackMeta.keys().next().value;
+    if (oldest === void 0) break;
+    trackMeta.delete(oldest);
+  }
+}
+function getTrackMeta(uri) {
+  return uri ? trackMeta.get(uri) : void 0;
+}
 async function discover(cfg2, state4, vibe, intensity) {
   const pool = await poolForVibe(vibe, intensity, cfg2.market, 1);
   if (vibeDef(vibe).audio.lyrics) {
@@ -22858,6 +22872,7 @@ async function playVibe(cfg2, state4, vibe, intensity, mode, auto = false) {
   try {
     const queue = await discover(cfg2, state4, vibe, intensity);
     lastQueue = queue;
+    recordMeta(queue, vibe);
     if (queue.length > 0) {
       await play({ uris: queue.slice(0, 50).map((c) => c.uri) });
       result.backend = "web";
@@ -22905,6 +22920,35 @@ async function playVibe(cfg2, state4, vibe, intensity, mode, auto = false) {
     result.message = `Playback failed: ${String(e)}`;
     return result;
   }
+}
+async function queueVibe(cfg2, state4, vibe, intensity, opts = {}, count = 8) {
+  const backend = opts.backend ?? (await nowPlaying2(cfg2).catch(() => null))?.backend;
+  if (backend !== "web") return null;
+  let queue;
+  try {
+    queue = await discover(cfg2, state4, vibe, intensity);
+  } catch (e) {
+    log("warn", "queueVibe discover failed", String(e));
+    return null;
+  }
+  const candidates = opts.currentUri ? queue.filter((t) => t.uri !== opts.currentUri) : queue;
+  const toQueue = candidates.slice(0, count);
+  if (toQueue.length === 0) return null;
+  let queued = 0;
+  for (const t of toQueue) {
+    try {
+      await queueAdd(t.uri);
+      queued++;
+    } catch (e) {
+      log("warn", "queueAdd failed mid-loop, stopping", String(e));
+      break;
+    }
+  }
+  if (queued === 0) return null;
+  recordMeta(candidates, vibe);
+  lastQueue = candidates;
+  log("info", "queued vibe to play next", { vibe, intensity, queued });
+  return { queued, first: toQueue[0] };
 }
 async function webOrLocal(webFn, localFn, cfg2) {
   try {
@@ -23057,14 +23101,16 @@ async function recordFeedback(sessionId, event, playedFraction) {
   const np = await nowPlaying2(cfg).catch(() => null);
   const uri = np?.track?.uri ?? head?.uri;
   if (!uri && event !== "ban") return null;
+  const meta = getTrackMeta(uri);
+  const cand = meta?.candidate ?? head;
   const ev = {
     ts: (/* @__PURE__ */ new Date()).toISOString(),
-    mode: s.current_vibe,
+    mode: meta?.vibe ?? s.current_vibe,
     event,
     track: uri,
-    artist: head?.artistId ? `spotify:artist:${head.artistId}` : void 0,
-    genres: head?.genres,
-    title: cfg.privacy.store_track_titles ? np?.track?.title ?? head?.title : void 0,
+    artist: cand?.artistId ? `spotify:artist:${cand.artistId}` : void 0,
+    genres: cand?.genres,
+    title: cfg.privacy.store_track_titles ? np?.track?.title ?? cand?.title : void 0,
     played_fraction: playedFraction,
     source: event.startsWith("sp_") ? "spotify" : event.startsWith("skip") || event === "completed" ? "player" : "user",
     hour: nowHour()
@@ -23093,11 +23139,14 @@ async function doDetectAndSwitch(ev) {
   const decision = shouldSwitch(SESSION, cfg, workMode, confidence);
   log("debug", "detect", { workMode, confidence, decision });
   if (!decision.switch) return null;
+  const intensity = defaultIntensity(decision.vibe);
+  const res = await queueVibe(cfg, state3, decision.vibe, intensity, {
+    backend: np.backend,
+    currentUri: np.track?.uri
+  });
+  if (!res || res.queued === 0) return null;
   applySwitch(SESSION, cfg, workMode, decision.vibe);
-  const s = getSession(SESSION, cfg);
-  const pb = await playVibe(cfg, state3, decision.vibe, s.intensity, workMode, true);
-  if (pb.is_playing) return `\u{1F39A}\uFE0F Switched to ${vibeDef(decision.vibe).label} for ${workMode}.`;
-  return null;
+  return `\u{1F39A}\uFE0F Queued ${vibeDef(decision.vibe).label} to play next (${res.queued} tracks) \u2014 for ${workMode}.`;
 }
 async function buildNowPlayingBanner(sessionId) {
   const s = getSession(sessionId, cfg);

@@ -85,10 +85,12 @@ When prompted, paste your **Client ID** and pick your **market** (e.g. `US`, `GB
 `connect` blocks until you click **Agree** in the browser, then reports the live
 connection status.
 
-**Auto-switch** is on by default but deliberately gentle: it only re-vibes music
-that's **already playing**, and only in response to **your prompts** (never tool
-activity), with a 4-minute debounce. It never starts music on its own. Turn it
-off any time with `/cadence:auto off` — then music only changes when you ask.
+**Auto-switch** is on by default but deliberately gentle: it never cuts the
+current track — it **queues the new vibe to play next**, so your song finishes
+first. It only acts when music is **already playing** and only in response to
+**your prompts** (never tool activity), with a 4-minute debounce, and never
+starts music on its own. Manual `/cadence:vibe` / `/cadence:play` switch
+immediately (that's your call). Turn auto off any time with `/cadence:auto off`.
 
 ## Commands
 
