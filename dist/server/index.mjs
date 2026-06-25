@@ -21110,6 +21110,7 @@ var DEFAULT_CONFIG = {
   default_vibe: "deep-focus",
   auto_switch: true,
   enable_local_fallback: true,
+  auth_port: 8888,
   debug: false,
   ranking_weights: {
     w_track: 0.3,
@@ -21279,11 +21280,13 @@ async function loadConfig(force = false) {
   const onDisk = await readJson(configPath(), {});
   let cfg2 = mergeConfig(DEFAULT_CONFIG, onDisk);
   const env = process.env;
+  const envPort = Number(env.CADENCE_AUTH_PORT?.trim());
   cfg2 = mergeConfig(cfg2, {
     market: env.CADENCE_MARKET?.trim() || cfg2.market,
     default_vibe: coerceVibe(env.CADENCE_DEFAULT_VIBE?.trim(), cfg2.default_vibe),
     auto_switch: envBool(env.CADENCE_AUTO_SWITCH, cfg2.auto_switch),
-    enable_local_fallback: envBool(env.CADENCE_LOCAL_FALLBACK, cfg2.enable_local_fallback)
+    enable_local_fallback: envBool(env.CADENCE_LOCAL_FALLBACK, cfg2.enable_local_fallback),
+    auth_port: Number.isFinite(envPort) && envPort > 0 ? envPort : cfg2.auth_port
   });
   if (Object.keys(onDisk).length === 0) {
     await writeJsonAtomic(configPath(), cfg2).catch(() => {
@@ -22294,7 +22297,7 @@ function buildAuthorizeUrl(redirectUri, challenge, state4) {
   });
   return `${AUTH_URL}?${p.toString()}`;
 }
-async function beginAuth(timeoutMs = 3e5) {
+async function beginAuth(port = 8888, timeoutMs = 3e5) {
   const cid = clientId();
   if (!cid) throw new NeedsAuthError("CADENCE_CLIENT_ID not configured");
   const verifier = genVerifier();
@@ -22337,8 +22340,24 @@ async function beginAuth(timeoutMs = 3e5) {
     activeCleanup = null;
   };
   activeCleanup = cleanup;
-  await new Promise((res) => server.listen(0, "127.0.0.1", res));
-  const port = server.address().port;
+  await new Promise((resolve, reject) => {
+    const onErr = (e) => {
+      if (e.code === "EADDRINUSE") {
+        reject(
+          new Error(
+            `Port ${port} is in use. Free it, or set a different auth_port in the plugin config and register http://127.0.0.1:<port>/callback in your Spotify app.`
+          )
+        );
+      } else {
+        reject(e);
+      }
+    };
+    server.once("error", onErr);
+    server.listen(port, "127.0.0.1", () => {
+      server.removeListener("error", onErr);
+      resolve();
+    });
+  });
   const redirectUri = `http://127.0.0.1:${port}/callback`;
   pending = { verifier, state: state4, redirectUri };
   const url = buildAuthorizeUrl(redirectUri, challenge, state4);
@@ -22908,7 +22927,7 @@ async function doConnect(redirectUrl) {
     return "\u2705 Connected to Spotify.";
   }
   try {
-    const handle = await beginAuth();
+    const handle = await beginAuth(cfg.auth_port);
     const settled = await Promise.race([
       handle.done.then(() => "done").catch((e) => `err:${e}`),
       new Promise((r) => setTimeout(() => r("pending"), 2500))
@@ -22923,7 +22942,7 @@ ${handle.url}`;
     return `Opening your browser to authorize Spotify. If it didn't open, visit:
 ${handle.url}
 
-(Your Spotify app's Redirect URI must be exactly http://127.0.0.1/callback \u2014 loopback IP, no port.)
+(Your Spotify app's Redirect URI must be exactly http://127.0.0.1:${cfg.auth_port}/callback \u2014 loopback IPv4, NOT localhost.)
 
 After approving, you'll see a success page. If you're on a headless/SSH session, copy the full redirected URL and run:
 /cadence connect <paste-url-here>`;

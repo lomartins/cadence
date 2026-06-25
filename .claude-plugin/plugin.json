@@ -17,9 +17,15 @@
     "spotify_client_id": {
       "type": "string",
       "title": "Spotify Client ID",
-      "description": "Client ID from your own Spotify app (developer.spotify.com/dashboard). In the app settings, add this exact Redirect URI: http://127.0.0.1/callback (loopback IP, no port — Cadence matches the runtime port automatically). Each user needs their own app — Spotify dev-mode caps apps at 5 users.",
+      "description": "Client ID from your own Spotify app (developer.spotify.com/dashboard). In the app settings, add this exact Redirect URI: http://127.0.0.1:8888/callback (loopback IPv4 — NOT localhost). If you change auth_port below, register the matching port. Each user needs their own app — Spotify dev-mode caps apps at 5 users.",
       "required": true,
       "sensitive": false
+    },
+    "auth_port": {
+      "type": "number",
+      "title": "OAuth callback port",
+      "description": "Local loopback port for the Spotify login callback. Must match the port in your registered Redirect URI (http://127.0.0.1:<port>/callback). Change only if 8888 is already in use.",
+      "default": 8888
     },
     "market": {
       "type": "string",

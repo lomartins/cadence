@@ -59,9 +59,11 @@ fully-deterministic preference model — no ML training on Spotify content.
 ### 1. Create your Spotify app (one time)
 
 1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) → **Create app**.
-2. Add a **Redirect URI**: `http://127.0.0.1/callback`
-   - use the `127.0.0.1` loopback IP literal (**not** `localhost`)
-   - **omit the port** — Cadence binds an ephemeral port and matches it dynamically.
+2. Add this exact **Redirect URI**: `http://127.0.0.1:8888/callback`
+   - use the `127.0.0.1` loopback IPv4 literal — **`localhost` is rejected by Spotify**
+   - `http` (not `https`) is allowed because it's loopback
+   - if port `8888` is taken on your machine, set a different `auth_port` in the
+     plugin config and register the matching `http://127.0.0.1:<port>/callback`
 3. Copy the **Client ID**.
 
 ### 2. Add the plugin

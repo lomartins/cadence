@@ -1,6 +1,5 @@
 import http from "node:http";
 import { spawn } from "node:child_process";
-import { AddressInfo } from "node:net";
 import { clientId } from "../config/load.js";
 import { genVerifier, challengeFromVerifier, genState } from "./pkce.js";
 import { setTokens, NeedsAuthError } from "./tokens.js";
@@ -91,11 +90,11 @@ function buildAuthorizeUrl(redirectUri: string, challenge: string, state: string
   return `${AUTH_URL}?${p.toString()}`;
 }
 
-// Start a loopback listener on an ephemeral port, return the authorize URL and a
-// promise that resolves once Spotify redirects back and the code is exchanged.
-// Register the redirect URI in the Spotify dashboard as http://127.0.0.1/callback
-// (loopback may omit the port; the runtime port is matched dynamically).
-export async function beginAuth(timeoutMs = 300_000): Promise<AuthHandle> {
+// Start a loopback listener on the configured fixed port, return the authorize
+// URL and a promise that resolves once Spotify redirects back and the code is
+// exchanged. Register the redirect URI in the Spotify dashboard as exactly
+// http://127.0.0.1:<port>/callback (loopback IPv4 — localhost is not allowed).
+export async function beginAuth(port = 8888, timeoutMs = 300_000): Promise<AuthHandle> {
   const cid = clientId();
   if (!cid) throw new NeedsAuthError("CADENCE_CLIENT_ID not configured");
 
@@ -145,8 +144,24 @@ export async function beginAuth(timeoutMs = 300_000): Promise<AuthHandle> {
   };
   activeCleanup = cleanup;
 
-  await new Promise<void>((res) => server.listen(0, "127.0.0.1", res));
-  const port = (server.address() as AddressInfo).port;
+  await new Promise<void>((resolve, reject) => {
+    const onErr = (e: NodeJS.ErrnoException) => {
+      if (e.code === "EADDRINUSE") {
+        reject(
+          new Error(
+            `Port ${port} is in use. Free it, or set a different auth_port in the plugin config and register http://127.0.0.1:<port>/callback in your Spotify app.`,
+          ),
+        );
+      } else {
+        reject(e);
+      }
+    };
+    server.once("error", onErr);
+    server.listen(port, "127.0.0.1", () => {
+      server.removeListener("error", onErr);
+      resolve();
+    });
+  });
   const redirectUri = `http://127.0.0.1:${port}/callback`;
   pending = { verifier, state, redirectUri };
 

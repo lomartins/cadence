@@ -11,6 +11,7 @@
         "CADENCE_DEFAULT_VIBE": "${user_config.default_vibe}",
         "CADENCE_AUTO_SWITCH": "${user_config.auto_switch}",
         "CADENCE_LOCAL_FALLBACK": "${user_config.enable_local_fallback}",
+        "CADENCE_AUTH_PORT": "${user_config.auth_port}",
         "CADENCE_DATA_DIR_OVERRIDE": "${user_config.data_dir}"
       }
     }

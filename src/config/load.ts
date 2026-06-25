@@ -37,11 +37,13 @@ export async function loadConfig(force = false): Promise<CadenceConfig> {
 
   // env overrides from .mcp.json (only when actually provided & non-empty)
   const env = process.env;
+  const envPort = Number(env.CADENCE_AUTH_PORT?.trim());
   cfg = mergeConfig(cfg, {
     market: env.CADENCE_MARKET?.trim() || cfg.market,
     default_vibe: coerceVibe(env.CADENCE_DEFAULT_VIBE?.trim(), cfg.default_vibe),
     auto_switch: envBool(env.CADENCE_AUTO_SWITCH, cfg.auto_switch),
     enable_local_fallback: envBool(env.CADENCE_LOCAL_FALLBACK, cfg.enable_local_fallback),
+    auth_port: Number.isFinite(envPort) && envPort > 0 ? envPort : cfg.auth_port,
   });
 
   // persist defaults on first run so users have a file to tune

@@ -54,7 +54,8 @@ recomputes the model from the log; `mcp__cadence__reset` wipes it.
 - The user needs their own Spotify app Client ID configured in the plugin
   settings (Spotify dev-mode caps an app at 5 users, so each user supplies their
   own). In the Spotify app settings the **Redirect URI must be exactly**
-  `http://127.0.0.1/callback` (loopback IP, no port). Playback **control** needs
+  `http://127.0.0.1:8888/callback` (loopback IPv4 — `localhost` is rejected;
+  change the port only via the `auth_port` config). Playback **control** needs
   Spotify Premium; without it, on Linux/macOS Cadence falls back to controlling
   the desktop Spotify app (play/pause/next).
 - First run: `/cadence connect` to authorize.

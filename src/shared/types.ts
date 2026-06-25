@@ -80,6 +80,7 @@ export interface CadenceConfig {
   default_vibe: VibeSlug;
   auto_switch: boolean;
   enable_local_fallback: boolean;
+  auth_port: number; // loopback OAuth callback port; register http://127.0.0.1:<port>/callback
   debug: boolean;
   ranking_weights: RankingWeights;
   signal_deltas: SignalDeltas;

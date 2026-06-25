@@ -6,6 +6,7 @@ export const DEFAULT_CONFIG: CadenceConfig = {
   default_vibe: "deep-focus",
   auto_switch: true,
   enable_local_fallback: true,
+  auth_port: 8888,
   debug: false,
   ranking_weights: {
     w_track: 0.3,
