@@ -21822,7 +21822,7 @@ async function refresh() {
     const text2 = await res.text().catch(() => "");
     if (res.status === 400 && /invalid_grant/.test(text2)) {
       await clearRefreshToken();
-      throw new NeedsAuthError("Refresh token expired or revoked \u2014 reconnect with /cadence connect");
+      throw new NeedsAuthError("Refresh token expired or revoked \u2014 reconnect with /cadence:connect");
     }
     throw new Error(`Token refresh failed: ${res.status} ${text2}`);
   }
@@ -22420,14 +22420,14 @@ async function beginAuth(port = 8888, timeoutMs = 3e5) {
 async function completeWithRedirectUrl(fullUrl) {
   const p = pending ?? loadPersistedPending();
   if (!p) {
-    throw new Error("No auth flow in progress \u2014 run /cadence connect first to generate a fresh URL.");
+    throw new Error("No auth flow in progress \u2014 run /cadence:connect first to generate a fresh URL.");
   }
   const u = new URL(fullUrl);
   const code = u.searchParams.get("code");
   const gotState = u.searchParams.get("state");
   if (!code) throw new Error("That URL has no ?code= \u2014 paste the full redirected URL.");
   if (gotState !== p.state) {
-    throw new Error("State mismatch \u2014 that URL is from an older attempt. Run /cadence connect for a fresh URL.");
+    throw new Error("State mismatch \u2014 that URL is from an older attempt. Run /cadence:connect for a fresh URL.");
   }
   await exchangeCode(code, p.redirectUri, p.verifier);
   activeCleanup?.();
@@ -22852,7 +22852,7 @@ async function playVibe(cfg2, state4, vibe, intensity, mode, auto = false) {
   const result = base(vibe, intensity, mode, auto);
   if (!await hasRefreshToken()) {
     result.needs_auth = true;
-    result.message = "Not connected to Spotify. Run /cadence connect.";
+    result.message = "Not connected to Spotify. Run /cadence:connect.";
     return result;
   }
   try {
@@ -22881,7 +22881,7 @@ async function playVibe(cfg2, state4, vibe, intensity, mode, auto = false) {
   } catch (e) {
     if (e instanceof NeedsAuthError) {
       result.needs_auth = true;
-      result.message = "Spotify session expired. Run /cadence connect.";
+      result.message = "Spotify session expired. Run /cadence:connect.";
       return result;
     }
     if (e instanceof PremiumRequiredError) {
@@ -22969,36 +22969,50 @@ async function init() {
 function nowHour() {
   return (/* @__PURE__ */ new Date()).getHours();
 }
+var CONNECT_WAIT_MS = 12e4;
+function connectedBanner(st) {
+  const lines = ["\u2705 Connected to Spotify."];
+  if (st.needs_premium) lines.push("\u26A0\uFE0F No Premium detected \u2014 playback control falls back to your local player.");
+  if (st.track?.title) lines.push(`Now: ${st.track.title}${st.track.artist ? " \u2014 " + st.track.artist : ""}`);
+  lines.push(
+    `vibe ${vibeDef(st.vibe).label} \xB7 auto-switch ${st.auto_switch ? "on" : "off"} \xB7 backend ${st.backend}`
+  );
+  lines.push("Run /cadence:play to start music.");
+  return lines.join("\n");
+}
 async function doConnect(redirectUrl) {
   if (!clientId()) {
     return "No Spotify Client ID configured. Set `spotify_client_id` in the plugin config (see README) and reconnect.";
   }
   if (redirectUrl) {
     await completeWithRedirectUrl(redirectUrl);
-    return "\u2705 Connected to Spotify.";
+    return connectedBanner(await doStatus(SESSION));
   }
   try {
     const handle = await beginAuth(cfg.auth_port);
-    const settled = await Promise.race([
-      handle.done.then(() => "done").catch((e) => `err:${e}`),
-      new Promise((r) => setTimeout(() => r("pending"), 2500))
-    ]);
-    if (settled === "done") return "\u2705 Connected to Spotify. Try `/cadence play`.";
-    if (typeof settled === "string" && settled.startsWith("err:")) {
-      return `Authorization failed: ${settled.slice(4)}
-Open this URL manually:
-${handle.url}`;
+    log("info", "authorize URL", { url: handle.url });
+    const outcome = await Promise.race([
+      handle.done.then(() => ({ kind: "ok" })),
+      new Promise((r) => setTimeout(() => r({ kind: "timeout" }), CONNECT_WAIT_MS))
+    ]).catch((e) => ({ kind: "err", error: String(e) }));
+    if (outcome.kind === "ok") {
+      return connectedBanner(await doStatus(SESSION));
     }
-    handle.done.then(() => log("info", "auth completed after handoff")).catch((e) => log("warn", "auth handoff failed", String(e)));
-    return `Opening your browser to authorize Spotify. If it didn't open, visit:
+    if (outcome.kind === "err") {
+      handle.cancel();
+      return `Authorization failed: ${outcome.error}
+
+Open this URL to try again:
 ${handle.url}
 
-After you click "Agree", it completes automatically \u2014 you'll see a "Cadence is connected" page. Then run /cadence status to confirm and /cadence play to start.
+Your Spotify app's Redirect URI must be exactly http://127.0.0.1:${cfg.auth_port}/callback (loopback IPv4, NOT localhost).`;
+    }
+    handle.done.then(() => log("info", "auth completed after timeout handoff")).catch((e) => log("warn", "auth handoff failed", String(e)));
+    return `Didn't receive the Spotify callback within ${CONNECT_WAIT_MS / 1e3}s. Open this URL to authorize:
+${handle.url}
 
-Redirect URI in your Spotify app must be exactly: http://127.0.0.1:${cfg.auth_port}/callback (loopback IPv4, NOT localhost).
-
-Headless/SSH (browser can't reach this machine)? Copy the full redirected URL from the address bar and run:
-/cadence connect <paste-url-here>`;
+It completes automatically once you click "Agree" (then run /cadence:status). Headless/SSH? Copy the full redirected URL and run:
+/cadence:connect <paste-url-here>`;
   } catch (e) {
     return `Could not start authorization: ${String(e)}`;
   }
@@ -23091,7 +23105,7 @@ async function buildNowPlayingBanner(sessionId) {
   const s = getSession(sessionId, cfg);
   const connected = await hasRefreshToken();
   if (!connected) {
-    return "\u{1F3A7} Cadence: not connected to Spotify. Run /cadence connect to enable focus music.";
+    return "\u{1F3A7} Cadence: not connected to Spotify. Run /cadence:connect to enable focus music.";
   }
   const np = await nowPlaying2(cfg).catch(() => null);
   const auto = s.auto_switch ? "on" : "off";
@@ -23099,7 +23113,7 @@ async function buildNowPlayingBanner(sessionId) {
   if (np?.track?.title) {
     return `\u{1F3A7} Cadence: ${np.track.title}${np.track.artist ? " \u2014 " + np.track.artist : ""} \xB7 vibe: ${vibe} \xB7 auto-switch: ${auto}`;
   }
-  return `\u{1F3A7} Cadence ready \xB7 vibe: ${vibe} \xB7 auto-switch: ${auto}. Use /cadence play to start.`;
+  return `\u{1F3A7} Cadence ready \xB7 vibe: ${vibe} \xB7 auto-switch: ${auto}. Use /cadence:play to start.`;
 }
 async function doStatus(sessionId) {
   const s = getSession(sessionId, cfg);

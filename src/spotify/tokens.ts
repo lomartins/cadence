@@ -58,7 +58,7 @@ export async function refresh(): Promise<void> {
     const text = await res.text().catch(() => "");
     if (res.status === 400 && /invalid_grant/.test(text)) {
       await clearRefreshToken();
-      throw new NeedsAuthError("Refresh token expired or revoked — reconnect with /cadence connect");
+      throw new NeedsAuthError("Refresh token expired or revoked — reconnect with /cadence:connect");
     }
     throw new Error(`Token refresh failed: ${res.status} ${text}`);
   }

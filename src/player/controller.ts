@@ -88,7 +88,7 @@ export async function playVibe(
 
   if (!(await hasRefreshToken())) {
     result.needs_auth = true;
-    result.message = "Not connected to Spotify. Run /cadence connect.";
+    result.message = "Not connected to Spotify. Run /cadence:connect.";
     return result;
   }
 
@@ -119,7 +119,7 @@ export async function playVibe(
   } catch (e) {
     if (e instanceof NeedsAuthError) {
       result.needs_auth = true;
-      result.message = "Spotify session expired. Run /cadence connect.";
+      result.message = "Spotify session expired. Run /cadence:connect.";
       return result;
     }
     if (e instanceof PremiumRequiredError) {

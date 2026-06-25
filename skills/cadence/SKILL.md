@@ -58,4 +58,4 @@ recomputes the model from the log; `mcp__cadence__reset` wipes it.
   change the port only via the `auth_port` config). Playback **control** needs
   Spotify Premium; without it, on Linux/macOS Cadence falls back to controlling
   the desktop Spotify app (play/pause/next).
-- First run: `/cadence connect` to authorize.
+- First run: `/cadence:connect` to authorize.

@@ -41,7 +41,7 @@ peaceful piano while you write, driving DnB when you're shipping under pressure.
  work mode  9-vibe map   (local, no-ML)    Web API     playerctl
                                                         / AppleScript
         ▲
-   slash commands (/cadence, /focus, /vibe) → mcp__cadence__* tools
+   slash commands (/cadence:play, /cadence:vibe, …) → mcp__cadence__* tools
 ```
 
 One MCP server owns everything (OAuth, state, curation, learning, playback).
@@ -78,30 +78,33 @@ When prompted, paste your **Client ID** and pick your **market** (e.g. `US`, `GB
 ### 3. Connect & play
 
 ```
-/cadence connect      # opens your browser to authorize Spotify
-/cadence play         # start focus music for what you're doing
+/cadence:connect      # opens your browser, waits for the callback, shows status
+/cadence:play         # start focus music for what you're doing
 ```
 
-That's it. Auto-switch is on by default.
+`connect` blocks until you click **Agree** in the browser, then reports the live
+connection status. Auto-switch is on by default.
 
 ## Commands
 
+Plugin commands are namespaced under `cadence:` (type `/cadence:` to see them all):
+
 | Command | What it does |
 |---------|--------------|
-| `/cadence connect` | Authorize Spotify (first run) |
-| `/cadence play [vibe] [0-4]` | Start music for the current task |
-| `/cadence pause` · `resume` · `skip` · `prev` | Transport controls |
-| `/cadence vibe <slug>` · `/vibe <slug>` | Switch vibe |
-| `/cadence intensity <0-4>` | Energy: 0 minimal … 4 peak |
-| `/cadence auto on\|off\|toggle` | Automatic switching |
-| `/cadence love\|like\|dislike\|ban\|more` | Teach your taste |
-| `/cadence status` · `now-playing` | What's happening |
-| `/cadence list` | List vibes |
-| `/cadence export` · `reset <all\|vibe>` · `forget <uri>` · `rebuild` | Manage your data |
-| `/focus [vibe] [0-4]` | Shortcut to start instantly |
+| `/cadence:connect [url]` | Authorize Spotify (waits for callback). Optional pasted URL for headless/SSH |
+| `/cadence:disconnect` | Clear stored tokens |
+| `/cadence:play [vibe] [0-4]` | Start music for the current task |
+| `/cadence:pause` · `/cadence:resume` · `/cadence:skip` | Transport controls |
+| `/cadence:vibe <slug>` | Switch vibe |
+| `/cadence:intensity <0-4>` | Energy: 0 minimal … 4 peak |
+| `/cadence:auto [on\|off\|toggle]` | Automatic switching |
+| `/cadence:love` · `/cadence:dislike` · `/cadence:ban` | Teach your taste |
+| `/cadence:status` | What's happening |
+| `/cadence:reset [all\|vibe]` | Reset learned preferences |
+| `/cadence:focus [vibe] [0-4]` | Shortcut to start instantly |
 
 You can also just *talk* to Claude: "play something calmer", "I love this one",
-"stop changing the music" — the bundled skill maps that to the right action.
+"stop changing the music" — the bundled skill maps that to the right MCP tool.
 
 ## The vibes
 
@@ -133,7 +136,7 @@ diversity cap so it never goes stale.
 
 It is **deterministic statistics, not ML** (counts, decay, Welford mean/var) —
 both to stay explainable and to respect Spotify's terms. `state.json` is just a
-fold over the log: `/cadence rebuild` recomputes it from scratch.
+fold over the log — it can be recomputed from scratch (the `rebuild` tool).
 
 Everything customizable lives in `config.json` (ranking weights, signal deltas,
 thresholds, decay half-life, explore epsilon, auto-switch debounce/confidence).
@@ -146,7 +149,7 @@ thresholds, decay half-life, explore epsilon, auto-switch debounce/confidence).
   falling back to a `0600` file. Never in `state.json`, never in the repo.
 - **Track titles are not stored** by default (`privacy.store_track_titles: false`) —
   only opaque Spotify URIs.
-- `/cadence export`, `reset`, `forget <uri>`, `rebuild` give you full control.
+- `/cadence:reset` (plus `export` / `forget <uri>` / `rebuild` — just ask Claude) give you full control.
 
 ## Spotify 2026 limitations (read this)
 
@@ -164,7 +167,7 @@ Cadence is built around what *survives*, but you should know:
 - **Recommendations / audio-features / related-artists endpoints are gone** for new
   apps — Cadence discovers via Search + your library instead, which is why curated
   search queries and your own taste do the heavy lifting.
-- **Refresh tokens expire after ~6 months** — you'll re-run `/cadence connect`
+- **Refresh tokens expire after ~6 months** — you'll re-run `/cadence:connect`
   about twice a year.
 
 ## Develop

@@ -64,7 +64,7 @@ async function main(): Promise<void> {
       const banner = res?.banner ?? "🎧 Cadence ready.";
       printBanner(banner);
     } catch {
-      printBanner("🎧 Cadence ready. Run /cadence connect to enable focus music.");
+      printBanner("🎧 Cadence ready. Run /cadence:connect to enable focus music.");
     }
     process.exit(0);
   }

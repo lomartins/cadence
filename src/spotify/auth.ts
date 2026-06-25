@@ -229,14 +229,14 @@ export async function beginAuth(port = 8888, timeoutMs = 300_000): Promise<AuthH
 export async function completeWithRedirectUrl(fullUrl: string): Promise<void> {
   const p = pending ?? loadPersistedPending();
   if (!p) {
-    throw new Error("No auth flow in progress — run /cadence connect first to generate a fresh URL.");
+    throw new Error("No auth flow in progress — run /cadence:connect first to generate a fresh URL.");
   }
   const u = new URL(fullUrl);
   const code = u.searchParams.get("code");
   const gotState = u.searchParams.get("state");
   if (!code) throw new Error("That URL has no ?code= — paste the full redirected URL.");
   if (gotState !== p.state) {
-    throw new Error("State mismatch — that URL is from an older attempt. Run /cadence connect for a fresh URL.");
+    throw new Error("State mismatch — that URL is from an older attempt. Run /cadence:connect for a fresh URL.");
   }
   await exchangeCode(code, p.redirectUri, p.verifier);
   // tear down the still-open loopback listener + timeout from beginAuth

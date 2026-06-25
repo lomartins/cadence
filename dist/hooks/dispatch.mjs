@@ -136,7 +136,7 @@ async function main() {
       const banner = res?.banner ?? "\u{1F3A7} Cadence ready.";
       printBanner(banner);
     } catch {
-      printBanner("\u{1F3A7} Cadence ready. Run /cadence connect to enable focus music.");
+      printBanner("\u{1F3A7} Cadence ready. Run /cadence:connect to enable focus music.");
     }
     process.exit(0);
   }
