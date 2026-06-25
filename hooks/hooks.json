@@ -1,5 +1,5 @@
 {
-  "description": "Cadence hooks — feed lightweight work-mode signals to the running MCP brain over a local socket. All non-blocking. The dispatcher resolves its data dir from CLAUDE_PLUGIN_DATA (injected by Claude Code) so no shell env-prefix is needed (works on Windows too).",
+  "description": "Cadence hooks — feed lightweight work-mode signals to the running MCP brain over a local socket. All non-blocking. The dispatcher resolves its data dir from CLAUDE_PLUGIN_DATA (injected by Claude Code) so no shell env-prefix is needed (works on Windows too). Only your prompts can trigger an auto-switch, and only when music is already playing — tool activity never changes the music.",
   "hooks": {
     "SessionStart": [
       {
@@ -19,19 +19,6 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/dist/hooks/dispatch.mjs\" prompt",
-            "timeout": 5,
-            "async": true
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write|Bash|Read|Grep",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/dist/hooks/dispatch.mjs\" tool",
             "timeout": 5,
             "async": true
           }

@@ -208,13 +208,18 @@ export async function doFeedback(
 }
 
 // ---- detection / auto-switch (from hooks) ----
+// Deliberately conservative so the music never changes "out of nowhere":
+//   - only a USER PROMPT can trigger a switch (tool activity never does)
+//   - we only RE-VIBE music that is already playing; we never start it unsolicited
+//   - plus the debounce + confidence gate in shouldSwitch()
 export async function doDetectAndSwitch(ev: HookEvent): Promise<string | null> {
-  if (ev.kind === "session-end") return null;
-  const { workMode, confidence } = classify({
-    prompt: ev.prompt,
-    tool_name: ev.tool_name,
-    tool_input: ev.tool_input,
-  });
+  if (ev.kind !== "prompt") return null;
+
+  // never start playback on its own — only adjust an already-playing session
+  const np = await controller.nowPlaying(cfg).catch(() => null);
+  if (!np || np.backend === "none" || !np.is_playing) return null;
+
+  const { workMode, confidence } = classify({ prompt: ev.prompt });
   const decision = shouldSwitch(SESSION, cfg, workMode, confidence);
   log("debug", "detect", { workMode, confidence, decision });
   if (!decision.switch) return null;

@@ -46,7 +46,7 @@ export const DEFAULT_CONFIG: CadenceConfig = {
   ],
   feature_norm: { tempo: [60, 200], loudness: [-60, 0] },
   selection: { max_per_artist: 2, queue_size: 25 },
-  autoswitch: { debounce_seconds: 90, confidence: 0.6 },
+  autoswitch: { debounce_seconds: 240, confidence: 0.72 },
   privacy: { store_track_titles: false, log_retention_days: 365 },
 };
 

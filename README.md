@@ -31,7 +31,7 @@ peaceful piano while you write, driving DnB when you're shipping under pressure.
 ```
  Claude Code session
         │
-   hooks (UserPromptSubmit / PostToolUse / SessionStart)   ← ~5ms, non-blocking
+   hooks (UserPromptSubmit / SessionStart)   ← ~5ms, non-blocking
         │  one-line event over a Unix socket
         ▼
    Cadence MCP server  ── the single "brain" ──────────────┐
@@ -83,7 +83,12 @@ When prompted, paste your **Client ID** and pick your **market** (e.g. `US`, `GB
 ```
 
 `connect` blocks until you click **Agree** in the browser, then reports the live
-connection status. Auto-switch is on by default.
+connection status.
+
+**Auto-switch** is on by default but deliberately gentle: it only re-vibes music
+that's **already playing**, and only in response to **your prompts** (never tool
+activity), with a 4-minute debounce. It never starts music on its own. Turn it
+off any time with `/cadence:auto off` — then music only changes when you ask.
 
 ## Commands
 

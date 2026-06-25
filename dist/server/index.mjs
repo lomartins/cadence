@@ -21150,7 +21150,7 @@ var DEFAULT_CONFIG = {
   ],
   feature_norm: { tempo: [60, 200], loudness: [-60, 0] },
   selection: { max_per_artist: 2, queue_size: 25 },
-  autoswitch: { debounce_seconds: 90, confidence: 0.6 },
+  autoswitch: { debounce_seconds: 240, confidence: 0.72 },
   privacy: { store_track_titles: false, log_retention_days: 365 }
 };
 var VALID_VIBES = [
@@ -23086,12 +23086,10 @@ async function doFeedback(sessionId, kind) {
   return `${map[kind]} \u2014 learned for ${label}.`;
 }
 async function doDetectAndSwitch(ev) {
-  if (ev.kind === "session-end") return null;
-  const { workMode, confidence } = classify({
-    prompt: ev.prompt,
-    tool_name: ev.tool_name,
-    tool_input: ev.tool_input
-  });
+  if (ev.kind !== "prompt") return null;
+  const np = await nowPlaying2(cfg).catch(() => null);
+  if (!np || np.backend === "none" || !np.is_playing) return null;
+  const { workMode, confidence } = classify({ prompt: ev.prompt });
   const decision = shouldSwitch(SESSION, cfg, workMode, confidence);
   log("debug", "detect", { workMode, confidence, decision });
   if (!decision.switch) return null;

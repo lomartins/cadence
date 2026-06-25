@@ -106,11 +106,14 @@ debounce/confidence, privacy) live in `config.json`.
 
 ## Detection & auto-switch
 
-`detect/classifier.ts` scores the prompt text + tool name + file extension
-against keyword rules to pick a work mode and a confidence. `detect/session.ts`
-gates an actual switch on: auto-switch enabled, the vibe genuinely changed,
-confidence ≥ threshold (default 0.6), and a debounce window (default 90s) since
-the last switch — so the music never thrashes mid-task.
+`detect/classifier.ts` scores the prompt text (and, when used directly, tool
+name + file extension) against keyword rules to pick a work mode and a
+confidence. Auto-switch is intentionally conservative so music never changes
+unexpectedly: only a **UserPromptSubmit** event can trigger it (tool activity
+never does), and only when music is **already playing** (it never starts
+playback on its own). `detect/session.ts` then gates the switch on: auto-switch
+enabled, the vibe genuinely changed, confidence ≥ threshold (default 0.72), and
+a debounce window (default 240s) since the last switch.
 
 ## Storage layout (`$CLAUDE_PLUGIN_DATA`, survives updates)
 
