@@ -20,7 +20,7 @@
     "spotify_client_id": {
       "type": "string",
       "title": "Spotify Client ID",
-      "description": "Client ID from your own Spotify app (developer.spotify.com/dashboard). Register a Redirect URI of 127.0.0.1 (loopback, WITHOUT a port). Each user needs their own app — Spotify dev-mode caps apps at 5 users.",
+      "description": "Client ID from your own Spotify app (developer.spotify.com/dashboard). In the app settings, add this exact Redirect URI: http://127.0.0.1/callback (loopback IP, no port — Cadence matches the runtime port automatically). Each user needs their own app — Spotify dev-mode caps apps at 5 users.",
       "required": true,
       "sensitive": false
     },

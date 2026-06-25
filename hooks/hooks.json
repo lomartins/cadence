@@ -1,13 +1,13 @@
 {
-  "description": "Cadence hooks — feed lightweight work-mode signals to the running MCP brain over a local socket. All non-blocking.",
+  "description": "Cadence hooks — feed lightweight work-mode signals to the running MCP brain over a local socket. All non-blocking. The dispatcher resolves its data dir from CLAUDE_PLUGIN_DATA (injected by Claude Code) so no shell env-prefix is needed (works on Windows too).",
   "hooks": {
     "SessionStart": [
       {
-        "matcher": "startup|resume",
+        "matcher": "startup|resume|clear|compact",
         "hooks": [
           {
             "type": "command",
-            "command": "CADENCE_DATA_DIR=\"${CLAUDE_PLUGIN_DATA}\" node \"${CLAUDE_PLUGIN_ROOT}/dist/hooks/dispatch.mjs\" now-playing",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/dist/hooks/dispatch.mjs\" now-playing",
             "timeout": 5
           }
         ]
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "CADENCE_DATA_DIR=\"${CLAUDE_PLUGIN_DATA}\" node \"${CLAUDE_PLUGIN_ROOT}/dist/hooks/dispatch.mjs\" prompt",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/dist/hooks/dispatch.mjs\" prompt",
             "timeout": 5,
             "async": true
           }
@@ -31,7 +31,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "CADENCE_DATA_DIR=\"${CLAUDE_PLUGIN_DATA}\" node \"${CLAUDE_PLUGIN_ROOT}/dist/hooks/dispatch.mjs\" tool",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/dist/hooks/dispatch.mjs\" tool",
             "timeout": 5,
             "async": true
           }
@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "CADENCE_DATA_DIR=\"${CLAUDE_PLUGIN_DATA}\" node \"${CLAUDE_PLUGIN_ROOT}/dist/hooks/dispatch.mjs\" session-end",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/dist/hooks/dispatch.mjs\" session-end",
             "timeout": 5,
             "async": true
           }

@@ -32,3 +32,7 @@ Thumbs.db
 # test / coverage
 coverage/
 .nyc_output/
+
+# scratch / dev junk
+.scratch_*
+*.scratch*

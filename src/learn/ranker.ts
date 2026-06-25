@@ -64,7 +64,9 @@ export function buildQueue(
 
   while (queue.length < size && pool.length > 0) {
     let pickIdx = 0;
-    if (rng() < epsilon && pool.length > topK) {
+    // decide explore vs exploit up front so the source label is accurate
+    const explored = rng() < epsilon && pool.length > topK;
+    if (explored) {
       // explore: weighted-random over the tail, biased by novelty
       const tail = pool.slice(topK);
       const weights = tail.map((r) => r.comp.A_novelty + 0.01);
@@ -84,8 +86,7 @@ export function buildQueue(
     if (chosen >= pool.length) chosen = pickIdx; // give up, accept original
 
     const [r] = pool.splice(chosen, 1);
-    const isExplore = chosen >= topK;
-    queue.push(isExplore ? { ...r.candidate, source: "explore" } : r.candidate);
+    queue.push(explored ? { ...r.candidate, source: "explore" } : r.candidate);
   }
 
   return queue;

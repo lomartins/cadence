@@ -11,7 +11,7 @@ import * as web from "../spotify/player.js";
 import * as local from "../spotify/local.js";
 import { poolForVibe, resolvePlaylistByName } from "../spotify/search.js";
 import { enrichGenres, topTracks } from "../spotify/library.js";
-import { PremiumRequiredError, NoActiveDeviceError } from "../spotify/client.js";
+import { PremiumRequiredError, NoActiveDeviceError, RateLimitedError } from "../spotify/client.js";
 import { NeedsAuthError, hasRefreshToken } from "../spotify/tokens.js";
 import { rankCandidates, buildQueue } from "../learn/ranker.js";
 import { ensureProfile } from "../learn/coldstart.js";
@@ -35,7 +35,7 @@ async function discover(
 
   // sprinkle in a few of the user's own top tracks for personalization
   try {
-    const tops = await topTracks("medium_term", 10);
+    const tops = await topTracks("medium_term", 10, cfg.market);
     for (const t of tops) if (!pool.some((p) => p.id === t.id)) pool.push(t);
   } catch {
     /* optional */
@@ -128,6 +128,10 @@ export async function playVibe(
       result.no_device = true;
       if (cfg.enable_local_fallback) return localFallback(result, "No active Spotify device.");
       result.message = "No active Spotify device. Open Spotify on a device and retry.";
+      return result;
+    }
+    if (e instanceof RateLimitedError) {
+      result.message = `Spotify is rate-limiting requests — try again in ~${e.retryAfter}s.`;
       return result;
     }
     log("error", "playVibe failed", String(e));

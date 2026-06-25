@@ -1,5 +1,4 @@
 import * as esbuild from "esbuild";
-import { mkdir, copyFile } from "node:fs/promises";
 
 const common = {
   bundle: true,
@@ -15,8 +14,7 @@ const common = {
   },
 };
 
-await mkdir("dist/data", { recursive: true });
-
+// presets.json is inlined into each bundle via the JSON import, so no copy needed.
 await esbuild.build({
   ...common,
   entryPoints: ["src/server/index.ts"],
@@ -28,8 +26,5 @@ await esbuild.build({
   entryPoints: ["src/hooks/dispatch.ts"],
   outfile: "dist/hooks/dispatch.mjs",
 });
-
-// presets.json is inlined into the bundle, but also ship a copy for tooling.
-await copyFile("src/data/presets.json", "dist/data/presets.json");
 
 console.log("cadence build complete -> dist/");

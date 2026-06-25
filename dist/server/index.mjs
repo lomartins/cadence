@@ -21169,11 +21169,13 @@ function coerceVibe(v, fallback) {
 // src/shared/paths.ts
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, chmodSync, writeFileSync, readFileSync } from "node:fs";
 function dataDir() {
   const override = process.env.CADENCE_DATA_DIR_OVERRIDE?.trim();
   if (override) return override;
-  const pluginData = process.env.CADENCE_DATA_DIR?.trim();
+  const explicit = process.env.CADENCE_DATA_DIR?.trim();
+  if (explicit) return explicit;
+  const pluginData = process.env.CLAUDE_PLUGIN_DATA?.trim();
   if (pluginData) return pluginData;
   const xdg = process.env.XDG_CONFIG_HOME?.trim();
   if (xdg) return join(xdg, "cadence");
@@ -21190,11 +21192,30 @@ var sockPath = () => join(d(), "cadence.sock");
 var spoolPath = () => join(d(), "spool.jsonl");
 var logPath = () => join(d(), "cadence.log");
 function ensureDirs() {
-  for (const dir of [d(), cacheDir()]) {
-    try {
-      mkdirSync(dir, { recursive: true });
-    } catch {
+  try {
+    mkdirSync(d(), { recursive: true, mode: 448 });
+    chmodSync(d(), 448);
+  } catch {
+  }
+  try {
+    mkdirSync(cacheDir(), { recursive: true, mode: 448 });
+  } catch {
+  }
+}
+function pointerPath() {
+  const base2 = process.env.CLAUDE_PLUGIN_DATA?.trim();
+  return base2 ? join(base2, ".datadir") : null;
+}
+function writeDataDirPointer() {
+  const ptr = pointerPath();
+  if (!ptr) return;
+  const resolved = d();
+  try {
+    if (resolved !== process.env.CLAUDE_PLUGIN_DATA?.trim()) {
+      mkdirSync(process.env.CLAUDE_PLUGIN_DATA.trim(), { recursive: true, mode: 448 });
+      writeFileSync(ptr, resolved, "utf8");
     }
+  } catch {
   }
 }
 
@@ -21715,9 +21736,10 @@ async function saveRefreshToken(token) {
     }
   }
   ensureDirs();
-  await writeFile2(credentialsPath(), JSON.stringify({ refresh_token: token }), "utf8");
-  await chmod(credentialsPath(), 384).catch(() => {
-  });
+  await writeFile2(credentialsPath(), JSON.stringify({ refresh_token: token }), { mode: 384 });
+  await chmod(credentialsPath(), 384).catch(
+    (e) => log("warn", "could not chmod credentials file to 0600 \u2014 token may be readable", String(e))
+  );
 }
 async function loadRefreshToken() {
   const kt = await tryKeytar();
@@ -21834,6 +21856,14 @@ var NoActiveDeviceError = class extends Error {
     this.name = "NoActiveDeviceError";
   }
 };
+var RateLimitedError = class extends Error {
+  retryAfter;
+  constructor(retryAfter) {
+    super(`Spotify rate limited (retry after ${retryAfter}s)`);
+    this.name = "RateLimitedError";
+    this.retryAfter = retryAfter;
+  }
+};
 function buildUrl(path, query) {
   const url = new URL(path.startsWith("http") ? path : BASE + path);
   if (query) {
@@ -21854,24 +21884,21 @@ async function request(path, opts = {}) {
     payload = JSON.stringify(body);
   }
   const res = await fetch(buildUrl(path, query), { method, headers, body: payload });
-  if (res.status === 204 || res.status === 202) return void 0;
+  if (res.status === 204) return void 0;
   if (res.status === 401 && !retried) {
     log("debug", "401 -> refresh and retry", { path });
-    try {
-      await refresh();
-    } catch (e) {
-      if (e instanceof NeedsAuthError) throw e;
-    }
+    await refresh();
     return request(path, { ...opts, retried: true });
   }
   if (res.status === 429) {
     const retryAfter = Number(res.headers.get("retry-after") ?? "1");
-    const waitMs = Math.min(retryAfter * 1e3 + 250, 1e4);
-    log("warn", "429 rate limited", { path, retryAfter });
+    const waitMs = Math.min(retryAfter * 1e3 + 250, 3e4);
+    log("warn", "429 rate limited", { path, retryAfter, retried });
     if (!retried) {
       await sleep(waitMs);
       return request(path, { ...opts, retried: true });
     }
+    throw new RateLimitedError(retryAfter);
   }
   const text2 = await res.text().catch(() => "");
   if (res.status === 403 && /premium/i.test(text2)) throw new PremiumRequiredError();
@@ -21909,18 +21936,18 @@ async function topArtists(time3 = "medium_term", limit = 20) {
     return [];
   }
 }
-async function topTracks(time3 = "medium_term", limit = 20) {
+async function topTracks(time3 = "medium_term", limit = 20, market) {
   try {
-    const r = await apiGet("/me/top/tracks", { time_range: time3, limit });
+    const r = await apiGet("/me/top/tracks", { time_range: time3, limit, market });
     return (r.items ?? []).map((t) => trackToCandidate(t, "top"));
   } catch (e) {
     log("warn", "topTracks failed", String(e));
     return [];
   }
 }
-async function savedTracks(limit = 50) {
+async function savedTracks(limit = 50, market) {
   try {
-    const r = await apiGet("/me/tracks", { limit });
+    const r = await apiGet("/me/tracks", { limit, market });
     return (r.items ?? []).map((i) => trackToCandidate(i.track, "library"));
   } catch (e) {
     log("warn", "savedTracks failed", String(e));
@@ -22005,7 +22032,7 @@ async function warmFromSpotify(state4, cfg2) {
       }
       touched++;
     }
-    const saved = await savedTracks(50);
+    const saved = await savedTracks(50, cfg2.market);
     for (const t of saved) {
       state4.global.track_scores[t.uri] = applyScoreUpdate(
         state4.global.track_scores[t.uri],
@@ -22191,15 +22218,11 @@ import { spawn } from "node:child_process";
 
 // src/spotify/pkce.ts
 import { randomBytes, createHash } from "node:crypto";
-var VERIFIER_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._~-";
 function base64url2(buf) {
   return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 function genVerifier(length = 64) {
-  const bytes = randomBytes(length);
-  let out = "";
-  for (let i = 0; i < length; i++) out += VERIFIER_CHARS[bytes[i] % VERIFIER_CHARS.length];
-  return out;
+  return base64url2(randomBytes(48)).slice(0, length);
 }
 function challengeFromVerifier(verifier) {
   return base64url2(createHash("sha256").update(verifier).digest());
@@ -22214,18 +22237,12 @@ var TOKEN_URL2 = "https://accounts.spotify.com/api/token";
 var SCOPES = [
   "user-read-playback-state",
   "user-modify-playback-state",
-  "user-read-currently-playing",
   "user-read-recently-played",
   "user-top-read",
-  "user-library-read",
-  "user-library-modify",
-  "user-follow-read",
-  "playlist-read-private",
-  "playlist-read-collaborative",
-  "playlist-modify-private",
-  "playlist-modify-public"
+  "user-library-read"
 ].join(" ");
 var pending = null;
+var activeCleanup = null;
 function openBrowser(url) {
   const platform = process.platform;
   const cmd = platform === "darwin" ? "open" : platform === "win32" ? "cmd" : "xdg-open";
@@ -22315,7 +22332,9 @@ async function beginAuth(timeoutMs = 3e5) {
     clearTimeout(timer);
     server.close();
     pending = null;
+    activeCleanup = null;
   };
+  activeCleanup = cleanup;
   await new Promise((res) => server.listen(0, "127.0.0.1", res));
   const port = server.address().port;
   const redirectUri = `http://127.0.0.1:${port}/callback`;
@@ -22343,7 +22362,7 @@ async function completeWithRedirectUrl(fullUrl) {
   const gotState = u.searchParams.get("state");
   if (!code || gotState !== pending.state) throw new Error("Invalid redirect URL (state mismatch)");
   await exchangeCode(code, pending.redirectUri, pending.verifier);
-  pending = null;
+  activeCleanup?.();
 }
 var SUCCESS_HTML = `<!doctype html><meta charset=utf-8><title>Cadence connected</title>
 <body style="font-family:system-ui;background:#0B0D18;color:#EAEAFF;display:grid;place-items:center;height:100vh;margin:0">
@@ -22700,7 +22719,8 @@ function buildQueue(ranked, profile, cfg2, rng = Math.random) {
   };
   while (queue.length < size && pool.length > 0) {
     let pickIdx = 0;
-    if (rng() < epsilon && pool.length > topK) {
+    const explored = rng() < epsilon && pool.length > topK;
+    if (explored) {
       const tail = pool.slice(topK);
       const weights = tail.map((r2) => r2.comp.A_novelty + 0.01);
       const total = weights.reduce((a, b) => a + b, 0);
@@ -22716,8 +22736,7 @@ function buildQueue(ranked, profile, cfg2, rng = Math.random) {
     while (chosen < pool.length && violatesDiversity(pool[chosen].candidate.artistId)) chosen++;
     if (chosen >= pool.length) chosen = pickIdx;
     const [r] = pool.splice(chosen, 1);
-    const isExplore = chosen >= topK;
-    queue.push(isExplore ? { ...r.candidate, source: "explore" } : r.candidate);
+    queue.push(explored ? { ...r.candidate, source: "explore" } : r.candidate);
   }
   return queue;
 }
@@ -22730,7 +22749,7 @@ function getLastQueueHead() {
 async function discover(cfg2, state4, vibe, intensity) {
   const pool = await poolForVibe(vibe, intensity, cfg2.market, 1);
   try {
-    const tops = await topTracks("medium_term", 10);
+    const tops = await topTracks("medium_term", 10, cfg2.market);
     for (const t of tops) if (!pool.some((p) => p.id === t.id)) pool.push(t);
   } catch {
   }
@@ -22805,6 +22824,10 @@ async function playVibe(cfg2, state4, vibe, intensity, mode, auto = false) {
       result.message = "No active Spotify device. Open Spotify on a device and retry.";
       return result;
     }
+    if (e instanceof RateLimitedError) {
+      result.message = `Spotify is rate-limiting requests \u2014 try again in ~${e.retryAfter}s.`;
+      return result;
+    }
     log("error", "playVibe failed", String(e));
     if (cfg2.enable_local_fallback) return localFallback(result, "Web playback failed.");
     result.message = `Playback failed: ${String(e)}`;
@@ -22860,16 +22883,15 @@ async function nowPlaying2(cfg2) {
 var SESSION = "primary";
 var cfg;
 var state3;
-var warmed = false;
 async function init() {
   cfg = await loadConfig();
   setDebug(cfg.debug);
+  writeDataDirPointer();
   state3 = await loadState();
   log("info", "cadence brain initialized");
   if (state3.created_at === state3.updated_at && await hasRefreshToken()) {
     warmFromSpotify(state3, cfg).then(() => saveState(state3)).catch(() => {
     });
-    warmed = true;
   }
 }
 function nowHour() {
@@ -22898,6 +22920,8 @@ ${handle.url}`;
     handle.done.then(() => log("info", "auth completed after handoff")).catch((e) => log("warn", "auth handoff failed", String(e)));
     return `Opening your browser to authorize Spotify. If it didn't open, visit:
 ${handle.url}
+
+(Your Spotify app's Redirect URI must be exactly http://127.0.0.1/callback \u2014 loopback IP, no port.)
 
 After approving, you'll see a success page. If you're on a headless/SSH session, copy the full redirected URL and run:
 /cadence connect <paste-url-here>`;
@@ -22944,8 +22968,7 @@ async function recordFeedback(sessionId, event, playedFraction) {
   const head = getLastQueueHead();
   const np = await nowPlaying2(cfg).catch(() => null);
   const uri = np?.track?.uri ?? head?.uri;
-  if (!uri && event !== "ban") {
-  }
+  if (!uri && event !== "ban") return null;
   const ev = {
     ts: (/* @__PURE__ */ new Date()).toISOString(),
     mode: s.current_vibe,
@@ -23140,7 +23163,7 @@ function registerTools(server) {
   });
   server.tool(
     "export",
-    "Export learned preferences as a portable JSON bundle (tokens excluded).",
+    "Export learned preferences as a portable JSON bundle. Spotify tokens are always excluded. With include_feedback (default true) the bundle also contains your full feedback history \u2014 track/artist URIs, time-of-day, and titles if store_track_titles is on; pass include_feedback:false for a PII-light bundle.",
     { include_feedback: external_exports.boolean().optional() },
     async ({ include_feedback }) => text(JSON.stringify(await doExport(include_feedback ?? true), null, 2))
   );

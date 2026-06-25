@@ -3,11 +3,13 @@ import { createRequire as __cadenceRequire } from 'node:module'; const require =
 // src/shared/paths.ts
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, chmodSync, writeFileSync, readFileSync } from "node:fs";
 function dataDir() {
   const override = process.env.CADENCE_DATA_DIR_OVERRIDE?.trim();
   if (override) return override;
-  const pluginData = process.env.CADENCE_DATA_DIR?.trim();
+  const explicit = process.env.CADENCE_DATA_DIR?.trim();
+  if (explicit) return explicit;
+  const pluginData = process.env.CLAUDE_PLUGIN_DATA?.trim();
   if (pluginData) return pluginData;
   const xdg = process.env.XDG_CONFIG_HOME?.trim();
   if (xdg) return join(xdg, "cadence");
@@ -18,11 +20,28 @@ var cacheDir = () => join(d(), "cache");
 var sockPath = () => join(d(), "cadence.sock");
 var spoolPath = () => join(d(), "spool.jsonl");
 function ensureDirs() {
-  for (const dir of [d(), cacheDir()]) {
-    try {
-      mkdirSync(dir, { recursive: true });
-    } catch {
-    }
+  try {
+    mkdirSync(d(), { recursive: true, mode: 448 });
+    chmodSync(d(), 448);
+  } catch {
+  }
+  try {
+    mkdirSync(cacheDir(), { recursive: true, mode: 448 });
+  } catch {
+  }
+}
+function pointerPath() {
+  const base = process.env.CLAUDE_PLUGIN_DATA?.trim();
+  return base ? join(base, ".datadir") : null;
+}
+function readDataDirPointer() {
+  const ptr = pointerPath();
+  if (!ptr) return null;
+  try {
+    const v = readFileSync(ptr, "utf8").trim();
+    return v || null;
+  } catch {
+    return null;
   }
 }
 
@@ -52,11 +71,8 @@ function sendIpc(sock, msg, opts = {}) {
     client.setTimeout(timeoutMs, () => fail(new Error("ipc timeout")));
     client.on("error", fail);
     client.on("connect", () => {
-      client.write(encode(msg));
-      if (!expectResponse) {
-        client.end();
-        done(null);
-      }
+      if (!expectResponse) client.end(encode(msg));
+      else client.write(encode(msg));
     });
     client.on("data", (chunk) => {
       buf += chunk.toString("utf8");
@@ -69,6 +85,7 @@ function sendIpc(sock, msg, opts = {}) {
         }
       }
     });
+    client.on("close", () => done(null));
     client.on("end", () => done(null));
   });
 }
@@ -98,6 +115,10 @@ function readStdin() {
   });
 }
 async function main() {
+  if (!process.env.CADENCE_DATA_DIR_OVERRIDE && !process.env.CADENCE_DATA_DIR) {
+    const ptr = readDataDirPointer();
+    if (ptr) process.env.CADENCE_DATA_DIR = ptr;
+  }
   const kind = process.argv[2] ?? "prompt";
   const raw = await readStdin();
   let input = {};

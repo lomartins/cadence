@@ -9,6 +9,7 @@ import type {
 } from "../shared/types.js";
 import { loadConfig } from "../config/load.js";
 import { setDebug, log } from "../shared/log.js";
+import { writeDataDirPointer } from "../shared/paths.js";
 import {
   loadState,
   saveState,
@@ -42,17 +43,19 @@ export const SESSION = "primary";
 
 let cfg: CadenceConfig;
 let state: State;
-let warmed = false;
 
 export async function init(): Promise<void> {
   cfg = await loadConfig();
   setDebug(cfg.debug);
+  // record the resolved data dir so the fast hook dispatcher finds the same socket
+  writeDataDirPointer();
   state = await loadState();
   log("info", "cadence brain initialized");
   // warm from Spotify on first ever run if already connected
   if (state.created_at === state.updated_at && (await hasRefreshToken())) {
-    warmFromSpotify(state, cfg).then(() => saveState(state)).catch(() => {});
-    warmed = true;
+    warmFromSpotify(state, cfg)
+      .then(() => saveState(state))
+      .catch(() => {});
   }
 }
 
@@ -88,7 +91,7 @@ export async function doConnect(redirectUrl?: string): Promise<string> {
     handle.done
       .then(() => log("info", "auth completed after handoff"))
       .catch((e) => log("warn", "auth handoff failed", String(e)));
-    return `Opening your browser to authorize Spotify. If it didn't open, visit:\n${handle.url}\n\nAfter approving, you'll see a success page. If you're on a headless/SSH session, copy the full redirected URL and run:\n/cadence connect <paste-url-here>`;
+    return `Opening your browser to authorize Spotify. If it didn't open, visit:\n${handle.url}\n\n(Your Spotify app's Redirect URI must be exactly http://127.0.0.1/callback — loopback IP, no port.)\n\nAfter approving, you'll see a success page. If you're on a headless/SSH session, copy the full redirected URL and run:\n/cadence connect <paste-url-here>`;
   } catch (e) {
     return `Could not start authorization: ${String(e)}`;
   }
@@ -150,9 +153,8 @@ async function recordFeedback(
   const head = controller.getLastQueueHead();
   const np = await controller.nowPlaying(cfg).catch(() => null);
   const uri = np?.track?.uri ?? head?.uri;
-  if (!uri && event !== "ban") {
-    // nothing identifiable playing
-  }
+  // nothing identifiable playing — don't pollute n_events / histograms with empties
+  if (!uri && event !== "ban") return null;
   const ev: FeedbackEvent = {
     ts: new Date().toISOString(),
     mode: s.current_vibe,

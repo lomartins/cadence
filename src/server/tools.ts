@@ -118,7 +118,7 @@ export function registerTools(server: McpServer): void {
 
   server.tool(
     "export",
-    "Export learned preferences as a portable JSON bundle (tokens excluded).",
+    "Export learned preferences as a portable JSON bundle. Spotify tokens are always excluded. With include_feedback (default true) the bundle also contains your full feedback history — track/artist URIs, time-of-day, and titles if store_track_titles is on; pass include_feedback:false for a PII-light bundle.",
     { include_feedback: z.boolean().optional() },
     async ({ include_feedback }) => text(JSON.stringify(await H.doExport(include_feedback ?? true), null, 2)),
   );

@@ -1,17 +1,14 @@
 import { randomBytes, createHash } from "node:crypto";
 
-const VERIFIER_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._~-";
-
 function base64url(buf: Buffer): string {
   return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-// 43–128 char verifier from the unreserved set (Spotify recommends 64).
+// 43–128 char verifier from the unreserved set. base64url output is exactly the
+// PKCE unreserved alphabet (A-Za-z0-9-_), so this is unbiased — no modulo.
 export function genVerifier(length = 64): string {
-  const bytes = randomBytes(length);
-  let out = "";
-  for (let i = 0; i < length; i++) out += VERIFIER_CHARS[bytes[i] % VERIFIER_CHARS.length];
-  return out;
+  // 48 random bytes -> 64 base64url chars
+  return base64url(randomBytes(48)).slice(0, length);
 }
 
 export function challengeFromVerifier(verifier: string): string {

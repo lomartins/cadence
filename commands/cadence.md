@@ -20,6 +20,7 @@ Mapping:
 - `vibe <slug>` → `mcp__cadence__set_vibe` with `vibe`
 - `intensity <0-4>` → `mcp__cadence__set_intensity`
 - `auto on|off|toggle` → `mcp__cadence__auto`
+- `nowplaying` / `np` → `mcp__cadence__now_playing`
 - `love` / `like` / `dislike` / `ban` / `more` (→ more_like_this) → `mcp__cadence__feedback` with `kind`
 - `list` / `vibes` → `mcp__cadence__list_vibes`
 - `export` → `mcp__cadence__export`

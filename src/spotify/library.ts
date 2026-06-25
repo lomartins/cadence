@@ -45,9 +45,13 @@ export async function topArtists(time: TimeRange = "medium_term", limit = 20): P
   }
 }
 
-export async function topTracks(time: TimeRange = "medium_term", limit = 20): Promise<TrackCandidate[]> {
+export async function topTracks(
+  time: TimeRange = "medium_term",
+  limit = 20,
+  market?: string,
+): Promise<TrackCandidate[]> {
   try {
-    const r = await apiGet<Paging<SpTrack>>("/me/top/tracks", { time_range: time, limit });
+    const r = await apiGet<Paging<SpTrack>>("/me/top/tracks", { time_range: time, limit, market });
     return (r.items ?? []).map((t) => trackToCandidate(t, "top"));
   } catch (e) {
     log("warn", "topTracks failed", String(e));
@@ -55,9 +59,9 @@ export async function topTracks(time: TimeRange = "medium_term", limit = 20): Pr
   }
 }
 
-export async function recentlyPlayed(limit = 50): Promise<TrackCandidate[]> {
+export async function recentlyPlayed(limit = 50, market?: string): Promise<TrackCandidate[]> {
   try {
-    const r = await apiGet<Paging<{ track: SpTrack }>>("/me/player/recently-played", { limit });
+    const r = await apiGet<Paging<{ track: SpTrack }>>("/me/player/recently-played", { limit, market });
     return (r.items ?? []).map((i) => trackToCandidate(i.track, "recent"));
   } catch (e) {
     log("warn", "recentlyPlayed failed", String(e));
@@ -65,9 +69,9 @@ export async function recentlyPlayed(limit = 50): Promise<TrackCandidate[]> {
   }
 }
 
-export async function savedTracks(limit = 50): Promise<TrackCandidate[]> {
+export async function savedTracks(limit = 50, market?: string): Promise<TrackCandidate[]> {
   try {
-    const r = await apiGet<Paging<{ track: SpTrack }>>("/me/tracks", { limit });
+    const r = await apiGet<Paging<{ track: SpTrack }>>("/me/tracks", { limit, market });
     return (r.items ?? []).map((i) => trackToCandidate(i.track, "library"));
   } catch (e) {
     log("warn", "savedTracks failed", String(e));

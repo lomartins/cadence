@@ -3,7 +3,7 @@
 // Claude Code turn: on any failure it spools the event (or prints a static
 // banner) and exits 0.
 
-import { sockPath, spoolPath, ensureDirs } from "../shared/paths.js";
+import { sockPath, spoolPath, ensureDirs, readDataDirPointer } from "../shared/paths.js";
 import { sendIpc } from "../shared/ipc.js";
 import { appendLine } from "../shared/atomic.js";
 import type { HookEvent, IpcMessage } from "../shared/types.js";
@@ -36,6 +36,13 @@ interface HookStdin {
 }
 
 async function main(): Promise<void> {
+  // If the user set a data_dir override, only the server knows it — follow the
+  // pointer it persisted under CLAUDE_PLUGIN_DATA so we hit the same socket.
+  if (!process.env.CADENCE_DATA_DIR_OVERRIDE && !process.env.CADENCE_DATA_DIR) {
+    const ptr = readDataDirPointer();
+    if (ptr) process.env.CADENCE_DATA_DIR = ptr;
+  }
+
   const kind = (process.argv[2] ?? "prompt") as HookEvent["kind"] | "now-playing";
   const raw = await readStdin();
   let input: HookStdin = {};

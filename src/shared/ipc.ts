@@ -51,11 +51,10 @@ export function sendIpc(
     client.on("error", fail);
 
     client.on("connect", () => {
-      client.write(encode(msg));
-      if (!expectResponse) {
-        client.end();
-        done(null);
-      }
+      // end() writes then half-closes, ensuring the payload flushes before the
+      // socket tears down (write()+destroy() can drop the buffered bytes).
+      if (!expectResponse) client.end(encode(msg));
+      else client.write(encode(msg));
     });
 
     client.on("data", (chunk) => {
@@ -70,6 +69,8 @@ export function sendIpc(
       }
     });
 
+    // resolve once the socket fully closes (covers the fire-and-forget path)
+    client.on("close", () => done(null));
     client.on("end", () => done(null));
   });
 }

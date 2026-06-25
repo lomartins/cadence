@@ -1,7 +1,0 @@
-Title: Hooks reference - Claude Code Docs
-
-URL Source: https://docs.claude.com/en/docs/claude-code/hooks
-
-Markdown Content:
-Hooks are user-defined shell commands, HTTP endpoints, or LLM prompts that execute automatically at specific points in Claude Code’s lifecycle. Use this reference to look up event schemas, configuration options, JSON input/output formats, and advanced features like async hooks, HTTP hooks, and MCP tool hooks. If you’re setting up hooks for the first time, start with the... (155451 bytes total)
-[full output: ~/.local/share/rtk/tee/1782400346_curl.log]

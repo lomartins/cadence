@@ -1,4 +1,4 @@
-import { getAccessToken, refresh, NeedsAuthError } from "./tokens.js";
+import { getAccessToken, refresh } from "./tokens.js";
 import { log } from "../shared/log.js";
 
 const BASE = "https://api.spotify.com/v1";
@@ -25,6 +25,15 @@ export class NoActiveDeviceError extends Error {
   constructor() {
     super("No active Spotify device");
     this.name = "NoActiveDeviceError";
+  }
+}
+
+export class RateLimitedError extends Error {
+  retryAfter: number;
+  constructor(retryAfter: number) {
+    super(`Spotify rate limited (retry after ${retryAfter}s)`);
+    this.name = "RateLimitedError";
+    this.retryAfter = retryAfter;
   }
 }
 
@@ -61,26 +70,25 @@ async function request<T>(path: string, opts: ReqOpts = {}): Promise<T> {
 
   const res = await fetch(buildUrl(path, query), { method, headers, body: payload });
 
-  if (res.status === 204 || res.status === 202) return undefined as T;
+  if (res.status === 204) return undefined as T;
 
   if (res.status === 401 && !retried) {
     log("debug", "401 -> refresh and retry", { path });
-    try {
-      await refresh();
-    } catch (e) {
-      if (e instanceof NeedsAuthError) throw e;
-    }
+    // let refresh failures (NeedsAuthError, network/5xx) propagate — never
+    // retry with the same expired token, which would mask the real cause.
+    await refresh();
     return request<T>(path, { ...opts, retried: true });
   }
 
   if (res.status === 429) {
     const retryAfter = Number(res.headers.get("retry-after") ?? "1");
-    const waitMs = Math.min(retryAfter * 1000 + 250, 10_000);
-    log("warn", "429 rate limited", { path, retryAfter });
+    const waitMs = Math.min(retryAfter * 1000 + 250, 30_000);
+    log("warn", "429 rate limited", { path, retryAfter, retried });
     if (!retried) {
       await sleep(waitMs);
       return request<T>(path, { ...opts, retried: true });
     }
+    throw new RateLimitedError(retryAfter);
   }
 
   const text = await res.text().catch(() => "");

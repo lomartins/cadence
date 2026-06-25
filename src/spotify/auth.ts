@@ -9,20 +9,14 @@ import { log } from "../shared/log.js";
 const AUTH_URL = "https://accounts.spotify.com/authorize";
 const TOKEN_URL = "https://accounts.spotify.com/api/token";
 
-// Read + write scopes for the full feature set (control + library + taste).
+// Minimal scopes — exactly the endpoints Cadence calls (playback control +
+// read-only taste signals). Add more only when a backing call is implemented.
 export const SCOPES = [
   "user-read-playback-state",
   "user-modify-playback-state",
-  "user-read-currently-playing",
   "user-read-recently-played",
   "user-top-read",
   "user-library-read",
-  "user-library-modify",
-  "user-follow-read",
-  "playlist-read-private",
-  "playlist-read-collaborative",
-  "playlist-modify-private",
-  "playlist-modify-public",
 ].join(" ");
 
 interface Pending {
@@ -31,6 +25,8 @@ interface Pending {
   redirectUri: string;
 }
 let pending: Pending | null = null;
+// closes the loopback server + clears the timeout for the in-flight flow
+let activeCleanup: (() => void) | null = null;
 
 export interface AuthHandle {
   url: string;
@@ -145,7 +141,9 @@ export async function beginAuth(timeoutMs = 300_000): Promise<AuthHandle> {
     clearTimeout(timer);
     server.close();
     pending = null;
+    activeCleanup = null;
   };
+  activeCleanup = cleanup;
 
   await new Promise<void>((res) => server.listen(0, "127.0.0.1", res));
   const port = (server.address() as AddressInfo).port;
@@ -179,7 +177,8 @@ export async function completeWithRedirectUrl(fullUrl: string): Promise<void> {
   const gotState = u.searchParams.get("state");
   if (!code || gotState !== pending.state) throw new Error("Invalid redirect URL (state mismatch)");
   await exchangeCode(code, pending.redirectUri, pending.verifier);
-  pending = null;
+  // tear down the still-open loopback listener + timeout from beginAuth
+  activeCleanup?.();
 }
 
 const SUCCESS_HTML = `<!doctype html><meta charset=utf-8><title>Cadence connected</title>

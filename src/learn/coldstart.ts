@@ -52,7 +52,7 @@ export async function warmFromSpotify(state: State, cfg: CadenceConfig): Promise
       }
       touched++;
     }
-    const saved = await savedTracks(50);
+    const saved = await savedTracks(50, cfg.market);
     for (const t of saved) {
       state.global.track_scores[t.uri] = applyScoreUpdate(
         state.global.track_scores[t.uri],

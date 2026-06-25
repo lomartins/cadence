@@ -29,8 +29,11 @@ export async function saveRefreshToken(token: string): Promise<void> {
     }
   }
   ensureDirs();
-  await writeFile(credentialsPath(), JSON.stringify({ refresh_token: token }), "utf8");
-  await chmod(credentialsPath(), 0o600).catch(() => {});
+  // create with restrictive perms from the start (don't rely on a later chmod)
+  await writeFile(credentialsPath(), JSON.stringify({ refresh_token: token }), { mode: 0o600 });
+  await chmod(credentialsPath(), 0o600).catch((e) =>
+    log("warn", "could not chmod credentials file to 0600 — token may be readable", String(e)),
+  );
 }
 
 export async function loadRefreshToken(): Promise<string | null> {
